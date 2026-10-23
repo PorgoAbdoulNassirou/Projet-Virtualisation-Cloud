@@ -20,6 +20,10 @@
 | 23/10 | PORGO | `.env` créé automatiquement au premier `vagrant up` | Concilier R1 (aucun geste manuel) et R7 (aucun secret versionné) |
 | 23/10 | PORGO | VRRP en unicast, les deux LB en BACKUP avec priorités 150/100 | Ne pas dépendre du multicast du réseau hôte-seul ; éviter un double maître au démarrage |
 | 23/10 | Groupe | Extensions E1 et E2 | Les plus démontrables, indépendantes du code applicatif |
+| 23/10 | KOBENDE | Une connexion à la base par requête, sans pool | Application strictement sans état et reconnexion automatique après la bascule ; coût d'ouverture acceptable à notre échelle |
+| 23/10 | KOBENDE | `target_session_attrs=read-write` sur `host=bdd1,bdd2` | L'application suit la bascule de la base sans modification ni redémarrage |
+| 23/10 | KOBENDE | Service systemd sous un utilisateur système dédié, `app.env` en mode 600 | Le service ne tourne jamais en root ; le mot de passe n'est lisible que par root |
+| 23/10 | KOBENDE | `connect_timeout=2` et `statement_timeout=2000` | `/sante` répond toujours avant le délai de la sonde HAProxy, même base morte |
 | | | | |
 
 ## Difficultés rencontrées et solutions
@@ -32,4 +36,5 @@
 | 23/10 | PORGO | V6 : le 1er script calculait la « reprise » depuis le lancement de `vagrant halt` (11,9 s), alors que lb1 sert encore pendant son arrêt propre : chiffre faux | Mesure de l'interruption réelle (dernier 200 avant la panne → premier 200 après) : 1,68 s puis 1,73 s. Les deux fichiers bruts sont conservés |
 | 23/10 | PORGO | R2 : bdd1 a cessé de répondre en SSH (« timeout during server version negotiating ») avec 1,8 Go de RAM libre sur l'hôte | `vagrant reload bdd1`, puis R2 rejoué : 6/6 identiques. Leçon : pendant le développement, `E2_OBS=0` et ne pas lancer d'autres applications lourdes |
 | 23/10 | PORGO | Sous Git Bash, `vagrant upload fichier /tmp/x` envoyait vers un chemin Windows (conversion automatique des chemins par MSYS) | Préfixer par `MSYS_NO_PATHCONV=1` (ajouté au dépannage du README) |
+| 23/10 | KOBENDE | Poste de développement Mac M2 (processeur ARM) : la box `bento/ubuntu-24.04` amd64 ne tourne pas sous VirtualBox, impossible de faire `vagrant up` localement | `app.py` testé sur l'hôte sans base (codes 200, 400, 404, 503 vérifiés) ; tests en VM (provision ×2, `/info`, `/sante`, V2) confiés au poste Windows de PORGO lors de la relecture de la PR |
 | | | | |

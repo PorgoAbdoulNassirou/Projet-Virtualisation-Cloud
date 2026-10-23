@@ -9,7 +9,7 @@ car ce sont les preuves des chiffres du dossier. Une mesure qui ne figure pas ic
 | Script | Scénario | Responsable | État |
 |---|---|---|---|
 | `v1_repartition.sh` | 20 appels à `/info`, écart entre serveurs < 20 % | THIOMBIANO | à écrire |
-| `v2_panne_app.sh` | `vagrant halt app1` pendant une charge | KOBENDE (rotation) | à écrire |
+| `v2_panne_app.sh` | `vagrant halt app1` pendant une charge | KOBENDE (rotation) | écrit, à mesurer avec l'application finale |
 | `v3_montee_charge.sh` | `ab -n 2000 -c 50` avec N=2 puis N=4 | THIOMBIANO | à écrire |
 | `v4_panne_bdd.sh` | `vagrant halt bdd1`, `/sante` → 503, bascule chronométrée | OUEDRAOGO / THIOMBIANO | à écrire |
 | `v5_reconstruction.sh` | `vagrant destroy -f` puis `vagrant up`, durée totale | THIOMBIANO | à écrire |

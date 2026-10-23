@@ -79,6 +79,28 @@ La configuration est **engendrée** par `scripts/generer_config_lb.py` puis vali
 
 ### 3.2 Application sans état, connexion multi-hôtes `target_session_attrs` (KOBENDE)
 
+Le service (`app/app.py`, 87 lignes) n'utilise que la bibliothèque standard (`ThreadingHTTPServer`) et
+`psycopg2`, installé par apt (`python3-psycopg2`) : aucun `pip`, donc aucun téléchargement imprévisible
+pendant le provisionnement.
+
+| Besoin | Choix dans l'application | Pourquoi |
+|---|---|---|
+| R3 / V2 : n'importe quel serveur peut répondre | **Aucun état** : ni session, ni fichier, ni compteur ; une connexion à la base par requête, toujours refermée (`finally`) | HAProxy peut envoyer chaque requête, ou la rejouer, sur n'importe quel serveur ; ajouter ou perdre un serveur ne perd aucune donnée |
+| V4 : survivre à la bascule de la base sans rien modifier | `host=<bdd1>,<bdd2>` et `target_session_attrs=read-write` | libpq essaie les hôtes dans l'ordre et ne garde que celui qui **accepte les écritures**. Avant la bascule, c'est bdd1 ; bdd1 éteinte, bdd2 encore réplique est refusée, donc `/sante` = 503 ; après `pg_promote()`, la même chaîne trouve bdd2 et `/sante` repasse à 200, sans redémarrer l'application |
+| R4 : la sonde de HAProxy doit dire la vérité | `/sante` exécute un vrai `SELECT 1` ; 200 seulement s'il réussit | Un serveur dont la base est perdue est retiré de la répartition au lieu de renvoyer des erreurs aux utilisateurs |
+| Réponse rapide même si la base est morte | `connect_timeout=2` et `statement_timeout=2000` | Une requête n'attend jamais indéfiniment : la sonde reçoit sa réponse sous les 5 s exigées (503 mesuré en 2,1 s sans base) |
+| Pas de trace brute visible | Toute `psycopg2.Error` devient un JSON `503` ; requête SQL paramétrée (`%s`) | Erreurs propres pour l'utilisateur ; protection contre l'injection SQL sur le matricule |
+| Démarrer avant la base | La connexion n'est ouverte qu'à la requête | Le service démarre même si bdd1 n'est pas prête : il répond 503 puis 200 dès que la base est là |
+
+**Déploiement** (`scripts/app.sh`) : `app.py` est copié dans `/opt/resultats-bf/` (on n'exécute jamais
+depuis le dossier synchronisé `/vagrant`). La configuration `/etc/resultats-bf/app.env` est construite
+avec `plateforme ip bdd1` / `plateforme ip bdd2` (aucune adresse en dur, R3) et `$PG_MDP_APP` venu du
+`.env` (aucun secret versionné, R7) ; elle est en mode **600**, propriété de root : systemd la lit avant de
+lancer le service. Le service systemd `resultats-app` tourne sous un **utilisateur système dédié**, non
+root, avec `ProtectSystem=strict`, et `Restart=always` le relance en 1 s s'il s'arrête. Chaque fichier
+passe par `installer_si_change` : le service n'est redémarré que si `app.py`, `app.env` ou l'unité ont
+réellement changé, ce qui rend le script idempotent (R2).
+
 ### 3.3 PostgreSQL et réplication en flux, choix asynchrone et son RPO (OUEDRAOGO)
 
 ### 3.4 Haute disponibilité du répartiteur : VRRP avec keepalived (PORGO)
@@ -195,6 +217,8 @@ VirtualBox 7.2.6, Vagrant 2.4.9 ; VM Ubuntu 24.04.3 LTS (noyau 6.8), HAProxy 2.8
 ## 7. Limites connues et ce que nous ferions autrement (tous)
 - Toutes les VM partagent un seul processeur physique : limite des mesures de charge.
 - Bascule de la base manuelle (pas de Patroni), réplication asynchrone.
+- Une connexion à la base par requête : simple et sans état, mais chaque requête paie l'ouverture de
+  connexion. Un petit pool qui se reconnecte serait plus performant sous forte charge (V3).
 - …
 
 ## 8. Annexes
