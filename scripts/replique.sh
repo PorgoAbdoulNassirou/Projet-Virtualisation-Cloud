@@ -1,4 +1,14 @@
 #!/usr/bin/env bash
+# =============================================================================
+# Rôle « replique » (bdd2) — réplique en flux (streaming replication) de bdd1
+# Responsable : OUEDRAOGO Armand Hendrix (ingénieur données)
+#
+# - même configuration réseau et pg_hba que bdd1 : bdd2 doit pouvoir être promue
+# - copie initiale par pg_basebackup -R -X stream, faite UNE seule fois
+#   (pas de standby.signal et pas encore de base « resultats »)
+# - garde-fou : si bdd2 a été promue primaire (bascule), elle n'est jamais
+#   réinitialisée ; R5 vérifiée : une écriture sur bdd1 est lue sur bdd2
+# =============================================================================
 set -euo pipefail
 source /vagrant/scripts/lib.sh
 

@@ -1,4 +1,17 @@
 #!/usr/bin/env bash
+# =============================================================================
+# Procédure de bascule de la base (R6, scénario V4) — chronométrée
+# Responsable : OUEDRAOGO Armand Hendrix (ingénieur données)
+#
+# Exécution (depuis l'hôte, à la racine du dépôt) :
+#   time vagrant ssh bdd2 -c "sudo bash /vagrant/scripts/bascule_bdd.sh"
+#
+# 1. refuse de promouvoir si l'ancien primaire répond encore (pas de double primaire)
+# 2. promeut la machine courante : SELECT pg_promote(true, 60)
+# 3. attend que pg_is_in_recovery() renvoie false, puis affiche la durée
+# Les applications n'ont rien à changer (host=bdd1,bdd2 target_session_attrs=read-write).
+# Ensuite : « vagrant up bdd1 » la remet en service comme réplique (reintegrer_bdd.sh).
+# =============================================================================
 set -euo pipefail
 source /vagrant/scripts/lib.sh
 

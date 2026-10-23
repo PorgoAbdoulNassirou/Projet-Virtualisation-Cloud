@@ -1,4 +1,15 @@
 #!/usr/bin/env bash
+# =============================================================================
+# Rôle « bdd » (bdd1) — PostgreSQL 16 primaire, lecture et écriture
+# Responsable : OUEDRAOGO Armand Hendrix (ingénieur données)
+#
+# - écoute sur le réseau privé (listen_addresses = '*' dans conf.d), port 5432
+# - pg_hba engendré : app_resultats et replicateur depuis le réseau du groupe,
+#   en scram-sha-256 ; mots de passe $PG_MDP_APP et $PG_MDP_REPLICATION
+# - base « resultats » : 50 000 lignes (generate_series, BF000001 à BF050000)
+# - idempotent : CREATE/ALTER selon l'existence, INSERT … ON CONFLICT DO NOTHING
+# - après une bascule, si bdd1 est devenue réplique : configuration seule
+# =============================================================================
 set -euo pipefail
 source /vagrant/scripts/lib.sh
 
