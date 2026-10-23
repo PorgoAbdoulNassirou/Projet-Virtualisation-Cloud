@@ -23,6 +23,8 @@ Le détail des tâches et des contrats est dans [docs/PLAN_DE_TRAVAIL.md](docs/P
 | Sections 2, 3.1, 3.4, 4, 5.1, 5.4 et mesures du dossier, journal de bord | `docs/dossier_architecture.md`, `docs/journal_de_bord.md` | PORGO Abdoul Nassirou | ✅ rédigé |
 | README, plan de travail, modèles du dossier et du journal | `README.md`, `docs/` | PORGO Abdoul Nassirou | ✅ écrit |
 | PostgreSQL primaire, 50 000 lignes, réplication en flux, bascule chronométrée (R5 vérifiée, R6 : 2 s) | `scripts/bdd.sh`, `scripts/replique.sh`, `scripts/bascule_bdd.sh`, `tests/resultats/bdd_20261023.log` | OUEDRAOGO Armand Hendrix | ✅ fusionné |
+| Service HTTP sans état (`/resultat`, `/sante`, `/info`), déploiement systemd, scénario V2 (0 requête perdue) | `app/app.py`, `scripts/app.sh`, `tests/v2_panne_app.sh` | KOBENDE Pêgdwendé Evrard | ✅ fusionné, testé en VM par PORGO |
+| Test d'intégration complet (R1 1 934 s, R2 6/6, R4 1,3 s, V6 1,70 s, bascule de base) et correctif `timeout check 3s` | `scripts/generer_config_lb.py`, `tests/resultats/` | PORGO Abdoul Nassirou | ✅ mesuré |
 | Squelettes et contrats des autres rôles | `scripts/bdd.sh`, `replique.sh`, `bascule_bdd.sh`, `app.sh`, `obs.sh`, `app/README.md`, `tests/README.md` | PORGO Abdoul Nassirou | ✅ squelettes, **à remplir** |
 
 > ✅ **Jalon J1 atteint le 23/10** : `vagrant up` complet réussi sur le poste de PORGO (box `bento/ubuntu-24.04`
@@ -64,7 +66,7 @@ Le détail des tâches et des contrats est dans [docs/PLAN_DE_TRAVAIL.md](docs/P
 |---|---|---|---|
 | 0 | PORGO | ✅ fait le 23/10 | ✅ poussé dans `main` |
 | 1 | OUEDRAOGO | ✅ fait le 23/10 | ✅ fusionné dans `main` (base, réplication, bascule) |
-| 2 | KOBENDE | dès le clone (écriture) ; intégration après OUEDRAOGO | sam. 24 soir |
+| 2 | KOBENDE | ✅ fait le 23/10 | ✅ fusionné dans `main` et testé en VM |
 | 3 | THIOMBIANO | dès le clone (E2) ; mesures après KOBENDE | dim. 25 soir (mesures), lun. 26 (dossier) |
 
 **Règle d'or : avant de pousser, `vagrant destroy -f && vagrant up` doit passer sur votre poste.**
@@ -235,9 +237,9 @@ requests vers main. Explique-moi chaque mesure pour que je puisse la défendre e
 
 - [x] **0** PORGO : J1 `vagrant up` réel validé
 - [x] **1** OUEDRAOGO : `bdd.sh` + `replique.sh` fusionnés (R5) — 23/10
-- [ ] **2** KOBENDE : `app.py` + `app.sh` fusionnés (V1, V2 possibles, J2)
+- [x] **2** KOBENDE : `app.py` + `app.sh` fusionnés (V2 mesuré : 0 perdue / 81) — 23/10
 - [x] **2** OUEDRAOGO : `bascule_bdd.sh` fusionné (bascule mesurée : 2 s) — 23/10
-- [x] **2** PORGO : R2, R3, R4, R8 vérifiés ; V6 mesuré (à rejouer avec l'application finale)
+- [x] **2** PORGO : R2, R3, R4, R8 vérifiés ; V6 rejoué avec l'application finale (1,70 s)
 - [ ] **1** THIOMBIANO : E2 fusionnée
 - [ ] **3** THIOMBIANO : V1, V3, V4, V5 mesurés ; dossier assemblé
 - [ ] **4** TOUS : `destroy` + `up` sur un poste vierge ; démo répétée ; chacun a lancé chaque scénario

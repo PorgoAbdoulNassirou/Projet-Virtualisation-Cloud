@@ -69,10 +69,21 @@ SSH (2222, 2200…) sont ceux que Vagrant ajoute pour son propre accès. La page
 | R3 : ajouter des serveurs sans coupure | `systemctl reload` : nouveau processus, connexions en cours conservées | Équivalent |
 | Observer la répartition | En-tête `X-Serveur`, page de stats, exportateur Prometheus intégré (`+PROMEX`) | Statistiques limitées en version libre |
 
-**Calcul du délai d'éviction (R4).** `inter 1s` (une sonde par seconde), `timeout check 1s`, `fall 2`
-(deux échecs consécutifs). Pire cas théorique : 1 s (attente de la sonde) + 2 × 1 s (deux sondes
-échouées) ≈ 3 s, donc moins de 5 s. **Mesuré : 1,04 s** (§ 6). `rise 2` évite qu'un serveur instable
-soit réintégré sur un seul succès.
+**Calcul du délai d'éviction (R4).** `inter 1s` (une sonde par seconde), `fall 2` (deux échecs
+consécutifs). Pour une sonde, HAProxy borne la **connexion** par `timeout connect` (1 s) et la **lecture**
+de la réponse par `timeout check` (3 s). Pire cas pour une panne franche (VM éteinte, service arrêté,
+connexion refusée) : 1 s (attente de la sonde) + 2 × 1 s ≈ 3 s, donc moins de 5 s. **Mesuré : 1,04 s avec
+l'application de test, 1,39 s avec l'application finale** (§ 6). `rise 2` évite qu'un serveur instable soit
+réintégré sur un seul succès.
+
+**Pourquoi 3 s de lecture et non 1 s** (correction du 23/10, trouvée au test d'intégration de la bascule) :
+après la bascule, bdd1 est éteinte et libpq essaie d'abord bdd1 avant bdd2, si bien que `/sante` répond
+200 en 0,6 à 2,1 s. Avec `timeout check 1s`, la sonde déclarait ces serveurs **sains** hors service
+(`L7TOUT`) et le service restait en 503 après une bascule pourtant réussie. **Compromis assumé** : un
+serveur *gelé* (qui accepte la connexion mais ne répond plus) serait écarté en 1 + 2 × 3 ≈ 7 s au pire, au-delà
+des 5 s ; ce cas n'entre pas dans les scénarios V2/V4, et le rejeu `retry-on response-timeout` protège tout de
+même les requêtes des utilisateurs. Amélioration possible : remettre bdd1 en service comme réplique
+(§ 5.3) supprime le détour par l'hôte éteint.
 
 La configuration est **engendrée** par `scripts/generer_config_lb.py` puis validée par `haproxy -c`
 **avant** d'être installée : une erreur arrête le provisionnement au lieu de casser un répartiteur en service.
@@ -182,11 +193,11 @@ Pour chaque scénario : **commande exacte**, **résultat brut** (renvoi au fichi
 | Scénario | Mesure attendue | Résultat | Fichier brut |
 |---|---|---|---|
 | V1 répartition | écart < 20 % | | |
-| V2 panne app1 | requêtes perdues, durée dégradée | | |
+| V2 panne app1 | requêtes perdues, durée dégradée | **0 perdue, 0 dégradée sur 81** (app1 répond jusqu'à 13,1 s après l'ordre d'arrêt, puis app2 seul) — mesure de PORGO avec le script de KOBENDE | `v2_20261023_163047.log` |
 | V3 charge N=2 / N=4 | req/s | | |
-| V4 panne bdd1 | durée de la bascule | | |
+| V4 panne bdd1 | durée de la bascule | *Test d'intégration (PORGO)* : `/sante` en **503 JSON** pendant la panne ; `bascule_bdd.sh` **3 s** ; service rétabli **5,1 s** après la fin de la bascule, sans redémarrer l'application. Mesure officielle V4 : THIOMBIANO | `integration_bascule_20261023_164927.log` |
 | V5 reconstruction | durée totale | | |
-| V6 panne lb1 | temps de reprise VRRP | **1 requête perdue sur 122, interruption réelle 1,73 s** (essai 1 : 1 sur 130, 1,68 s) | `v6_20261023_104601.log`, `v6_20261023_104251.log` |
+| V6 panne lb1 | temps de reprise VRRP | **Application finale : 1 requête perdue sur 124, interruption réelle 1,70 s.** Application de test : 1/122 en 1,73 s, 1/130 en 1,68 s | `v6_20261023_163244.log`, `v6_20261023_104601.log`, `v6_20261023_104251.log` |
 
 Commande V6 : `DUREE=45 bash tests/v6_panne_lb.sh` (une requête vers `http://192.168.59.5/info` toutes les
 200 ms, `vagrant halt lb1` à t = 5 s). **Commentaire** : `vagrant halt` éteint lb1 proprement en une dizaine de
@@ -200,16 +211,18 @@ l'expiration des annonces (3 × `advert_int` + décalage ≈ 3 à 4 s), ce qui r
 
 | Exigence | Méthode | Résultat | Fichier brut |
 |---|---|---|---|
-| R1 | `vagrant up` sur une plateforme vierge (box non présente) | succès, **1 433 s** téléchargement inclus | — (journal de la console) |
-| R2 | `vagrant provision` ×2 sur les 6 VM, empreintes SHA-256 de `/etc/hosts`, `haproxy.cfg`, `keepalived.conf` | **6/6 identiques** | `repartition_20261023_105608.log` |
+| R1 | `vagrant destroy -f && vagrant up`, plateforme complète (bases, application, répartiteurs), sans aucune commande ensuite | succès, **1 934 s** (box déjà en cache) ; 1er `vagrant up` du socle seul : 1 433 s téléchargement de la box inclus | — (journal de la console) |
+| R2 | `vagrant provision` ×2 sur les 6 VM, empreintes SHA-256 des fichiers de configuration (socle, HAProxy, keepalived, application, PostgreSQL) **et PID des services** | **6/6 identiques** sur la plateforme complète | `repartition_20261023_162550.log` (socle seul : `repartition_20261023_105608.log`) |
 | R3 | `NB_APP=4` puis stats HAProxy et 20 appels à `/info` | 4 serveurs UP, **5/5/5/5** ; retour à 2 exécuté | `repartition_20261023_110244.log` |
-| R4 | arrêt du service de app1, scrutation des stats toutes les 200 ms | app1 écarté en **1 037 ms** (< 5 000) | `repartition_20261023_104215.log` |
+| R4 | arrêt du service de app1, scrutation des stats toutes les 200 ms | application finale : **1 394 ms**, puis **1 279 ms** après le passage à `timeout check 3s` (application de test : 1 037 ms) ; exigence < 5 000 ms | `repartition_20261023_162950.log`, `repartition_20261023_165028.log`, `repartition_20261023_104215.log` |
 | R8 | `vagrant port` sur chaque VM | seul lb1 : 80 → 8080 ; ailleurs SSH Vagrant uniquement | `repartition_20261023_104842.log` |
-| V1 (préliminaire) | 20 appels à `/info` sur l'IP virtuelle, N = 2 | **10/10**, écart 0 % | — (à refaire par THIOMBIANO avec l'application finale) |
+| V1 (préliminaire) | 20 appels à `/info` sur l'IP virtuelle, N = 2 | **10/10**, écart 0 %, avec l'application de test puis avec l'application finale (alternance stricte app1/app2) | — (mesure officielle : THIOMBIANO, `v1_repartition.sh`) |
 
-Ces mesures ont été faites avec une **application de test temporaire** (15 lignes, répond 200 sur toutes les
-routes) en attendant le service final : elles valident le répartiteur, pas l'application. V1, V2 et V3
-seront refaits avec l'application finale.
+Les premières mesures (matin du 23/10) ont été faites avec une **application de test temporaire** (15 lignes,
+répond 200 sur toutes les routes) ; R1, R2, R4, V2 et V6 ont été **refaites l'après-midi avec l'application
+finale et la base répliquée** : ce sont les chiffres de référence. L'application finale a aussi été vérifiée
+sur tous ses cas de réponse via l'IP virtuelle : 200 (matricule existant, dont `BF050000`), 400 (paramètre
+absent), 404 (matricule ou route inconnus) ; une tentative d'injection SQL (`BF000001' OR 1=1--`) renvoie 404.
 
 Poste de mesure : Intel Core i7-1165G7 (4 cœurs, 8 threads), 15,7 Go de RAM, Windows 11 Professionnel,
 VirtualBox 7.2.6, Vagrant 2.4.9 ; VM Ubuntu 24.04.3 LTS (noyau 6.8), HAProxy 2.8.30, keepalived 2.2.8.
