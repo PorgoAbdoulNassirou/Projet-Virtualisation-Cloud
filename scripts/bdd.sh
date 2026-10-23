@@ -38,6 +38,13 @@ fi
 
 attendre_port 127.0.0.1 5432 120
 
+# Après une bascule, bdd1 a pu être reconvertie en réplique (reintegrer_bdd.sh) :
+# elle est en lecture seule, ses données viennent du primaire. Rien à écrire.
+if [ "$(sudo -u postgres psql -tAc 'SELECT pg_is_in_recovery()')" = "t" ]; then
+  journal "bdd1 est une réplique (après bascule) : configuration seule, aucune écriture"
+  exit 0
+fi
+
 sudo -u postgres psql -v ON_ERROR_STOP=1 <<'SQL'
 SELECT 'CREATE DATABASE resultats'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'resultats')\gexec

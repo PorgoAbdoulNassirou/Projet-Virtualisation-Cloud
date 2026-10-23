@@ -2,7 +2,12 @@
 set -euo pipefail
 source /vagrant/scripts/lib.sh
 
-primaire=$(plateforme ip bdd1)
+# Symétrique : promeut la machine où il est lancé, l'ancien primaire est l'autre.
+# Cas nominal : vagrant ssh bdd2 -c "sudo bash /vagrant/scripts/bascule_bdd.sh"
+case "$(hostname -s)" in
+  bdd1) primaire=$(plateforme ip bdd2) ;;
+  *)    primaire=$(plateforme ip bdd1) ;;
+esac
 debut_epoch=$(date +%s)
 debut=$(date --iso-8601=seconds)
 journal "début de bascule : $debut"
@@ -10,7 +15,7 @@ journal "début de bascule : $debut"
 # Ne jamais promouvoir si l'ancien primaire accepte encore des connexions : cela
 # évite de créer deux nœuds inscriptibles lors d'un simple incident réseau local.
 if timeout 2 bash -c "exec 3<>/dev/tcp/${primaire}/5432" 2>/dev/null; then
-  journal "ÉCHEC : bdd1 ($primaire:5432) est encore joignable, promotion annulée"
+  journal "ÉCHEC : l'ancien primaire ($primaire:5432) est encore joignable, promotion annulée"
   exit 1
 fi
 

@@ -138,6 +138,13 @@ Vagrant.configure("2") do |config|
       # c'est ce qui lui fait découvrir les nouveaux serveurs quand NB_APP change.
       m.vm.provision "role", type: "shell", path: "scripts/#{n['role']}.sh",
                      env: VARIABLES, run: (n["role"] == "lb" ? "always" : "once")
+
+      # Bases : après une bascule, l'ancien primaire qui redémarre est
+      # reconverti en réplique du nouveau (§ 5.3). Sans effet en temps normal.
+      if %w[bdd replique].include?(n["role"])
+        m.vm.provision "reintegrer", type: "shell", path: "scripts/reintegrer_bdd.sh",
+                       env: VARIABLES, run: "always"
+      end
     end
   end
 end

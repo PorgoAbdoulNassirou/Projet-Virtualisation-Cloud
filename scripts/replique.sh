@@ -29,9 +29,20 @@ installer_si_change "$tmp" /etc/postgresql/16/main/pg_hba.conf 644 || [ "$?" -eq
 # Le fichier est généré par root ; il doit rester lisible par PostgreSQL.
 chmod 644 /etc/postgresql/16/main/pg_hba.conf
 
-attendre_port "$primaire" 5432 120
 replica=/var/lib/postgresql/16/main
-if [ ! -f "$replica/standby.signal" ]; then
+# Garde-fou : après une bascule, bdd2 est PRIMAIRE (plus de standby.signal) et
+# contient la base « resultats ». Sans ce test, rejouer ce script l'effacerait
+# pour la recopier depuis l'ancien primaire. Une installation neuve, elle, n'a
+# pas encore la base « resultats ».
+promue=0
+if [ ! -f "$replica/standby.signal" ] && \
+   [ "$(sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname = 'resultats'" 2>/dev/null)" = "1" ]; then
+  promue=1
+  journal "bdd2 a été promue primaire (bascule) : aucune réinitialisation"
+fi
+
+if [ ! -f "$replica/standby.signal" ] && [ "$promue" -eq 0 ]; then
+  attendre_port "$primaire" 5432 120
   systemctl stop postgresql
   find "$replica" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
   install -o postgres -g postgres -m 700 -d "$replica"
@@ -53,4 +64,4 @@ if [ "$regle" -lt 1 ]; then
   journal "ÉCHEC : règle pg_hba de réplication absente ou invalide"
   exit 1
 fi
-journal "réplique prête : $(sudo -u postgres psql -tAc 'SELECT pg_is_in_recovery()')"
+journal "bdd2 prête, pg_is_in_recovery = $(sudo -u postgres psql -tAc 'SELECT pg_is_in_recovery()') (t = réplique, f = primaire après bascule)"

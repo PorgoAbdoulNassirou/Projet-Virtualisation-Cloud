@@ -1,0 +1,55 @@
+Remise en service de bdd1 après bascule (§ 5.3) — 23/10/2026 17:36:38
+--- 0. état nominal : la réintégration ne fait rien
+    bdd1: == [bdd1] primaire à jour (ligne de temps 1, bdd2 : 1) : rien à réintégrer
+--- 1. panne de bdd1 et bascule sur bdd2
+== [bdd2] début de bascule : 2026-10-23T17:38:17+00:00
+== [bdd2] fin de bascule : 2026-10-23T17:38:20+00:00
+== [bdd2] durée : 3 s
+bdd2 en récupération ? f
+--- 2. écriture sur le nouveau primaire bdd2 PENDANT que bdd1 est éteinte
+INSERT 0 1
+--- 3. retour de bdd1 : vagrant up bdd1
+    bdd1: == [bdd1] ANCIEN PRIMAIRE détecté (ligne de temps 1 < 2 sur bdd2) : conversion en réplique
+    bdd1: == [bdd1] réplique de bdd2 : réception du flux « streaming », en 39 s
+durée de vagrant up bdd1 : 208 s
+--- 4. vérifications
+bdd1 en récupération (réplique) ? t
+bdd1 reçoit le flux de : 
+ligne écrite pendant la panne, lue sur bdd1 : REPRISE01 Test reprise
+INSERT 0 1
+nouvelle écriture sur bdd2, lue sur bdd1 1 s après : REPRISE02
+nombre de lignes bdd1 / bdd2 : 50002 / 50002
+service via l'IP virtuelle : {"etat": "ok", "serveur": "app2"} [200] 0.333655s
+matricule écrit pendant la panne, via le service : {"matricule": "REPRISE02", "nom": "Test reprise 2", "serie": "C", "moyenne": 14.0, "admis": true, "serveur": "app1"} [200]
+bdd1 reçoit le flux de (requête corrigée) : 192.168.59.32|streaming
+Fenêtre à risque (journal systemd de bdd1, démarrage → arrêt de l'ancien primaire) :
+Oct 23 17:41:07.321663 bdd1 systemd[1]: Started postgresql@16-main.service - PostgreSQL Cluster 16-main.
+Oct 23 17:41:50.057613 bdd1 systemd[1]: Stopping postgresql@16-main.service - PostgreSQL Cluster 16-main...
+Oct 23 17:41:51.586361 bdd1 systemd[1]: Stopped postgresql@16-main.service - PostgreSQL Cluster 16-main.
+Oct 23 17:42:27.918583 bdd1 systemd[1]: Started postgresql@16-main.service - PostgreSQL Cluster 16-main.
+--- 5. R2 après bascule : vagrant provision ×2 sur bdd1 (réplique) et bdd2 (primaire)
+passe 1, bdd1 : code 0
+    bdd1: == [bdd1] installation de PostgreSQL primaire
+    bdd1: == [bdd1] paquets déjà présents : postgresql-16
+    bdd1: == [bdd1] bdd1 est une réplique (après bascule) : configuration seule, aucune écriture
+    bdd1: == [bdd1] réplique de bdd2 : rien à réintégrer
+passe 1, bdd2 : code 0
+    bdd2: == [bdd2] installation de PostgreSQL et préparation de la réplique
+    bdd2: == [bdd2] paquets déjà présents : postgresql-16
+    bdd2: == [bdd2] bdd2 a été promue primaire (bascule) : aucune réinitialisation
+    bdd2: == [bdd2] bdd2 prête, pg_is_in_recovery = f (t = réplique, f = primaire après bascule)
+    bdd2: == [bdd2] primaire à jour (ligne de temps 2, bdd1 : 2) : rien à réintégrer
+passe 2, bdd1 : code 0
+    bdd1: == [bdd1] installation de PostgreSQL primaire
+    bdd1: == [bdd1] paquets déjà présents : postgresql-16
+    bdd1: == [bdd1] bdd1 est une réplique (après bascule) : configuration seule, aucune écriture
+    bdd1: == [bdd1] réplique de bdd2 : rien à réintégrer
+passe 2, bdd2 : code 0
+    bdd2: == [bdd2] installation de PostgreSQL et préparation de la réplique
+    bdd2: == [bdd2] paquets déjà présents : postgresql-16
+    bdd2: == [bdd2] bdd2 a été promue primaire (bascule) : aucune réinitialisation
+    bdd2: == [bdd2] bdd2 prête, pg_is_in_recovery = f (t = réplique, f = primaire après bascule)
+    bdd2: == [bdd2] primaire à jour (ligne de temps 2, bdd1 : 2) : rien à réintégrer
+après : bdd1 recovery=t bdd2 recovery=f ; lignes bdd2 = 50002
+--- 6. nettoyage sur bdd2 : DELETE 2
+lignes bdd1 après nettoyage (répliqué) : 50000
