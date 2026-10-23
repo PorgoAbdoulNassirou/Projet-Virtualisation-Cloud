@@ -1,0 +1,8 @@
+== Vérification répartition — 23/10/2026 11:02:44 — groupe réseau 192.168.59.0/24
+### R3 — serveurs déclarés dans HAProxy
+app1 UP
+app2 UP
+app3 UP
+app4 UP
+→ NB_APP = 4, serveurs dans HAProxy = 4
+Résultat brut : tests/resultats/repartition_20261023_110244.log

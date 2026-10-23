@@ -1,0 +1,10 @@
+== Vérification répartition — 23/10/2026 10:48:42 — groupe réseau 192.168.59.0/24
+### R8 — ports exposés vers l'hôte
+bdd1 :     22 (guest) => 2222 (host) 
+bdd2 :     22 (guest) => 2200 (host) 
+app1 :     22 (guest) => 2201 (host) 
+app2 :     22 (guest) => 2202 (host) 
+lb1 :     80 (guest) => 8080 (host)     22 (guest) => 2203 (host) 
+lb2 :     22 (guest) => 2204 (host) 
+→ attendu : 22 => 2222… (SSH Vagrant) partout, et 80 => 8080 uniquement sur lb1
+Résultat brut : tests/resultats/repartition_20261023_104842.log

@@ -31,22 +31,28 @@ while [ "$(date +%s)" -lt "$FIN" ]; do
 done
 wait
 
-# Analyse : requêtes totales, échecs, première et dernière erreur.
+# Analyse. « vagrant halt » arrête lb1 proprement en une dizaine de secondes,
+# pendant lesquelles lb1 sert encore : on mesure donc l'interruption RÉELLE,
+# du dernier succès avant la 1re erreur au 1er succès après la dernière erreur.
 awk '
-  $2 == "ARRET_LB1" { arret = $1; next }
   NF == 2 && $2 ~ /^[0-9]+$/ {
     total++
-    if ($2 != "200") { echecs++; if (!debut) debut = $1; fin = $1 }
+    if ($2 == "200") {
+      if (!echecs) dernier_ok = $1          # dernier succès avant la panne
+      else if (!reprise) reprise = $1       # premier succès après une erreur
+    } else {
+      echecs++; reprise = 0                 # une nouvelle erreur annule la reprise
+    }
   }
   END {
-    printf "Requêtes envoyées      : %d\n", total
-    printf "Requêtes en échec      : %d\n", echecs
-    if (echecs) {
-      printf "Période dégradée       : %.1f s (de la 1re à la dernière erreur)\n", (fin - debut) / 1000
-      if (arret) printf "Reprise après l arrêt  : %.1f s\n", (fin - arret) / 1000
-    } else {
+    printf "Requêtes envoyées       : %d\n", total
+    printf "Requêtes en échec       : %d\n", echecs
+    if (echecs && reprise)
+      printf "Interruption réelle     : %.2f s (dernier 200 avant panne → premier 200 après)\n", (reprise - dernier_ok) / 1000
+    else if (echecs)
+      print "Service NON rétabli pendant l observation"
+    else
       print "Aucune requête perdue."
-    }
   }' "$SORTIE" | tee -a "$SORTIE"
 
 echo "Résultat brut : ${SORTIE}"

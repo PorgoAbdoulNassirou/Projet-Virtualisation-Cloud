@@ -1,0 +1,10 @@
+== Vérification répartition — 23/10/2026 10:49:23 — groupe réseau 192.168.59.0/24
+### R2 — idempotence (vagrant provision rejoué deux fois)
+bdd1 : ÉCHEC du 1er provisionnement
+bdd2 : identique ✔
+app1 : identique ✔
+app2 : identique ✔
+lb1 : identique ✔
+lb2 : identique ✔
+→ R2 NON satisfaite
+Résultat brut : tests/resultats/repartition_20261023_104923.log

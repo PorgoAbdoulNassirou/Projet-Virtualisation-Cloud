@@ -13,7 +13,8 @@ car ce sont les preuves des chiffres du dossier. Une mesure qui ne figure pas ic
 | `v3_montee_charge.sh` | `ab -n 2000 -c 50` avec N=2 puis N=4 | THIOMBIANO | à écrire |
 | `v4_panne_bdd.sh` | `vagrant halt bdd1`, `/sante` → 503, bascule chronométrée | OUEDRAOGO / THIOMBIANO | à écrire |
 | `v5_reconstruction.sh` | `vagrant destroy -f` puis `vagrant up`, durée totale | THIOMBIANO | à écrire |
-| `v6_panne_lb.sh` | `vagrant halt lb1`, service joignable sur l'IP virtuelle | PORGO (rotation) | **prêt** |
+| `v6_panne_lb.sh` | `vagrant halt lb1`, service joignable sur l'IP virtuelle | PORGO (rotation) | **mesuré** : 1/122 perdue, 1,73 s |
+| `verifier_repartition.sh` | R2 (idempotence), R3 (NB_APP), R4 (éviction < 5 s), R8 (ports) | PORGO | **mesuré** |
 
 ## Adresse à interroger
 
