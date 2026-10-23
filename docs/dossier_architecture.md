@@ -174,7 +174,46 @@ Les deux sens ont été exécutés (§ 6).
 
 ### 5.2 Bascule de la base : `bascule_bdd.sh`, étapes et durée (OUEDRAOGO)
 
-### 5.3 Remise en service de bdd1 comme nouvelle réplique (OUEDRAOGO)
+### 5.3 Remise en service de bdd1 comme nouvelle réplique (PORGO, pour OUEDRAOGO)
+
+**Le problème.** Après une bascule, bdd2 est primaire. Quand on rallume bdd1, systemd relance PostgreSQL
+**en primaire** : il y a deux primaires (« cerveau divisé »). Comme la chaîne de connexion des applications
+essaie bdd1 en premier, elles liraient l'ancienne base, à laquelle il manque tout ce qui a été écrit depuis la
+panne. Deuxième danger : rejouer `replique.sh` sur bdd2 promue l'aurait **effacée** pour la recopier depuis
+l'ancien primaire.
+
+**La procédure : une seule commande, `vagrant up bdd1`.** Le provisionneur `reintegrer`
+(`scripts/reintegrer_bdd.sh`, rejoué à chaque `vagrant up` des deux bases) fait le travail :
+
+1. Si la machine est déjà une réplique (`standby.signal`), ou si l'autre base est injoignable, il ne fait rien.
+2. Il compare les **lignes de temps** PostgreSQL : la sienne (`pg_controldata`) et celle de l'autre base
+   (commande de réplication `IDENTIFY_SYSTEM`). Chaque promotion incrémente la ligne de temps : si l'autre
+   est plus récente, cette machine est l'ancien primaire.
+3. Dans ce seul cas : arrêt de PostgreSQL, effacement des données périmées, `pg_basebackup -R` depuis
+   le nouveau primaire, redémarrage en réplique, et vérification que le flux est bien reçu (`streaming`).
+
+Le script est **symétrique** (il sert aussi si bdd2 tombe à son tour), comme `bascule_bdd.sh`, qui promeut
+désormais la machine où on le lance. Deux garde-fous complètent la procédure : `bdd.sh` n'écrit plus rien si
+bdd1 est réplique, et `replique.sh` refuse de réinitialiser bdd2 si elle contient déjà la base (promue).
+
+**Mesures** (fichier `reintegration_bdd1_*.log`) :
+
+| Étape | Résultat |
+|---|---|
+| État nominal, `--provision-with reintegrer` sur bdd1 | « primaire à jour (ligne de temps 1, bdd2 : 1) » : rien fait |
+| Bascule (`halt bdd1` puis `bascule_bdd.sh` sur bdd2) | 3 s |
+| Écriture sur bdd2 pendant que bdd1 est éteinte | ligne `REPRISE01` insérée |
+| `vagrant up bdd1` | ancien primaire détecté (ligne de temps 1 < 2), **converti en réplique en 39 s** ; commande complète 208 s (démarrage de la VM compris) |
+| Données | `REPRISE01` présente sur bdd1 ; nouvelle écriture sur bdd2 lue sur bdd1 1 s après ; 50 002 lignes de chaque côté |
+| Service | `/sante` 200 en 0,33 s (contre ≈ 2 s tant que bdd1 était éteinte : libpq écarte vite une réplique joignable) |
+| R2 après bascule | `vagrant provision` ×2 sur bdd1 (réplique) et bdd2 (primaire) : 4 × code 0, aucune écriture, aucune réinitialisation |
+
+**Limite connue, mesurée.** Entre le démarrage de la VM et le passage du provisionneur, bdd1 tourne en
+primaire périmé pendant **42,7 s** (journal systemd : démarrage 17:41:07,3, arrêt 17:41:50,1). Pendant
+cette fenêtre, une application peut lire des données périmées ; elle ne peut pas créer d'écritures
+divergentes, car le service est en lecture seule. Amélioration possible : une condition de démarrage
+systemd (`ExecStartPre`) sur PostgreSQL qui fasse la même comparaison des lignes de temps **avant** de
+démarrer, ce qui fermerait la fenêtre.
 
 ### 5.4 Panne et retour d'un répartiteur (PORGO)
 

@@ -25,6 +25,7 @@ Le détail des tâches et des contrats est dans [docs/PLAN_DE_TRAVAIL.md](docs/P
 | PostgreSQL primaire, 50 000 lignes, réplication en flux, bascule chronométrée (R5 vérifiée, R6 : 2 s) | `scripts/bdd.sh`, `scripts/replique.sh`, `scripts/bascule_bdd.sh`, `tests/resultats/bdd_20261023.log` | OUEDRAOGO Armand Hendrix | ✅ fusionné |
 | Service HTTP sans état (`/resultat`, `/sante`, `/info`), déploiement systemd, scénario V2 (0 requête perdue) | `app/app.py`, `scripts/app.sh`, `tests/v2_panne_app.sh` | KOBENDE Pêgdwendé Evrard | ✅ fusionné, testé en VM par PORGO |
 | Test d'intégration complet (R1 1 934 s, R2 6/6, R4 1,3 s, V6 1,70 s, bascule de base) et correctif `timeout check 3s` | `scripts/generer_config_lb.py`, `tests/resultats/` | PORGO Abdoul Nassirou | ✅ mesuré |
+| Remise en service de bdd1 après bascule (§ 5.3) : réintégration automatique en réplique, garde-fous `bdd.sh` / `replique.sh`, bascule symétrique | `scripts/reintegrer_bdd.sh`, `Vagrantfile`, `scripts/bdd.sh`, `scripts/replique.sh`, `scripts/bascule_bdd.sh` | PORGO Abdoul Nassirou (pour OUEDRAOGO) | ✅ testé : réplique en 39 s, R2 après bascule OK |
 | Squelettes et contrats des autres rôles | `scripts/bdd.sh`, `replique.sh`, `bascule_bdd.sh`, `app.sh`, `obs.sh`, `app/README.md`, `tests/README.md` | PORGO Abdoul Nassirou | ✅ squelettes, **à remplir** |
 
 > ✅ **Jalon J1 atteint le 23/10** : `vagrant up` complet réussi sur le poste de PORGO (box `bento/ubuntu-24.04`
