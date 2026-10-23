@@ -82,8 +82,8 @@ après la bascule, bdd1 est éteinte et libpq essaie d'abord bdd1 avant bdd2, si
 (`L7TOUT`) et le service restait en 503 après une bascule pourtant réussie. **Compromis assumé** : un
 serveur *gelé* (qui accepte la connexion mais ne répond plus) serait écarté en 1 + 2 × 3 ≈ 7 s au pire, au-delà
 des 5 s ; ce cas n'entre pas dans les scénarios V2/V4, et le rejeu `retry-on response-timeout` protège tout de
-même les requêtes des utilisateurs. Amélioration possible : remettre bdd1 en service comme réplique
-(§ 5.3) supprime le détour par l'hôte éteint.
+même les requêtes des utilisateurs. Le détour par l'hôte éteint ne dure que jusqu'à la remise en service de
+bdd1 comme réplique (§ 5.3) : `/sante` répond alors en 0,33 s.
 
 La configuration est **engendrée** par `scripts/generer_config_lb.py` puis validée par `haproxy -c`
 **avant** d'être installée : une erreur arrête le provisionnement au lieu de casser un répartiteur en service.
@@ -114,6 +114,17 @@ réellement changé, ce qui rend le script idempotent (R2).
 
 ### 3.3 PostgreSQL et réplication en flux, choix asynchrone et son RPO (OUEDRAOGO)
 
+> Rédigé par PORGO à partir des scripts d'OUEDRAOGO (`bdd.sh`, `replique.sh`) ; à relire par OUEDRAOGO.
+
+| Besoin | Choix | Pourquoi |
+|---|---|---|
+| Un volume de données réaliste pour les mesures | Table `resultats(matricule PK, nom, serie, moyenne, admis)`, **50 000 lignes** engendrées par `generate_series` (matricules `BF000001` à `BF050000`, moyenne déterministe entre 0 et 20) | Même jeu de données à chaque reconstruction (R1) ; insertion en `ON CONFLICT DO NOTHING` : rejouable (R2) |
+| R5 : une seconde copie toujours à jour | **Réplication physique en flux** (`pg_basebackup -R -X stream` depuis bdd1) | Mécanisme natif de PostgreSQL 16, sans logiciel supplémentaire ; bdd2 est une copie exacte, promouvable par `pg_promote()` |
+| Choix asynchrone | Réglage par défaut (`synchronous_standby_names` vide) | Une écriture n'attend pas bdd2 : bdd1 reste disponible même si bdd2 tombe. Le prix est un **RPO non nul** : les dernières transactions non encore transmises sont perdues si bdd1 tombe. Mesuré : une écriture sur le primaire est lue sur la réplique moins d'une seconde après (§ 5.3). Pour RÉSULTATS-BF, l'application ne fait que **lire** des données chargées au provisionnement : le RPO effectif est nul |
+| Sécurité des accès | `pg_hba.conf` engendré : `app_resultats` (SELECT seulement) et `replicateur` (REPLICATION) acceptés uniquement depuis `192.168.59.0/24`, en `scram-sha-256` ; mots de passe passés par l'environnement | Moindre privilège ; aucun secret dans le dépôt (R7) ; aucun accès extérieur au réseau privé (R8) |
+| Durabilité | Données dans `/var/lib/postgresql/16/main`, **jamais** dans `/vagrant` | Le dossier synchronisé de VirtualBox ne garantit ni les verrous ni `fsync` (piège connu de l'énoncé) |
+| Ne jamais écraser une base à jour | Garde-fous : `replique.sh` ne recopie que si bdd2 n'a pas encore la base ; `bdd.sh` n'écrit rien sur une réplique | Le provisionnement reste rejouable même après une bascule (§ 5.3) |
+
 ### 3.4 Haute disponibilité du répartiteur : VRRP avec keepalived (PORGO)
 
 Un répartiteur unique est un point de défaillance unique. lb1 et lb2 exécutent la même configuration
@@ -142,14 +153,19 @@ L'exportateur Prometheus intégré à HAProxy est déjà actif sur `http://<ip l
 |---|---|---|
 | Répartiteur | lb1 seul | lb1 + lb2, IP virtuelle VRRP (E1) |
 | Serveur applicatif | — | N ≥ 2, sonde de santé, rejeu des requêtes |
-| Base de données | — | (OUEDRAOGO) |
+| Base de données | bdd1 seule | bdd1 + réplique en flux bdd2, bascule chronométrée (≈ 3 s), réintégration automatique de l'ancien primaire |
+
+**Points de défaillance qui restent** : la bascule de la base est **manuelle** (il faut lancer
+`bascule_bdd.sh`) ; l'hôte physique unique (toutes les VM sur un seul ordinateur) ; le réseau hôte-seul
+unique ; la machine de supervision obs (sa perte n'interrompt pas le service).
 
 ## 4. Reproductibilité et qualité (PORGO)
 
 - **R1, reconstruction.** Sur un clone neuf, `vagrant up` suffit : le `.env` absent est créé à partir de
   `.env.exemple` avec des mots de passe aléatoires (`SecureRandom`), la box est épinglée
   (`bento/ubuntu-24.04` `202510.26.0`), et tout le reste est installé par les scripts. Premier `vagrant up`
-  complet mesuré : **1 433 s** (téléchargement de la box inclus).
+  du socle mesuré : **1 433 s** (téléchargement de la box inclus) ; reconstruction complète
+  (`vagrant destroy -f && vagrant up`, bases, application et répartiteurs) : **1 934 s**.
 - **R2, idempotence.** Trois techniques : `installer_paquets` n'appelle apt que pour les paquets absents ;
   `installer_si_change` n'écrase un fichier (et ne recharge le service) que si son contenu a changé ;
   `/etc/hosts` est un bloc entre marqueurs réécrit à l'identique, jamais un `>>`. Vérifié par empreintes
@@ -173,6 +189,40 @@ Pour revenir à 2 : `NB_APP=4 vagrant destroy -f app3 app4`, remettre `NB_APP=2`
 Les deux sens ont été exécutés (§ 6).
 
 ### 5.2 Bascule de la base : `bascule_bdd.sh`, étapes et durée (OUEDRAOGO)
+
+> Rédigé par PORGO à partir du script d'OUEDRAOGO et des mesures ; à relire par OUEDRAOGO.
+
+**Quand ?** bdd1 (primaire) est tombée : `/sante` renvoie 503 sur tous les serveurs applicatifs et HAProxy
+renvoie un 503 JSON (`{"erreur": "aucun serveur applicatif disponible"}`), jamais une page blanche.
+
+**Commande** (depuis l'hôte, à la racine du dépôt) :
+
+```bash
+time vagrant ssh bdd2 -c "sudo bash /vagrant/scripts/bascule_bdd.sh"
+```
+
+**Étapes du script** :
+
+1. **Vérifier que l'ancien primaire est vraiment hors service** (tentative de connexion TCP de 2 s sur son
+   port 5432). S'il répond encore, la promotion est **annulée** : promouvoir bdd2 à côté d'un bdd1 vivant
+   créerait deux primaires.
+2. **Promouvoir** bdd2 : `SELECT pg_promote(true, 60)` (seulement si elle est encore en récupération,
+   donc rejouable sans effet).
+3. **Attendre** que `pg_is_in_recovery()` renvoie `false` (120 s au maximum, sinon échec explicite).
+4. **Afficher** l'heure de début, l'heure de fin et la durée.
+
+Rien n'est à modifier côté application : sa chaîne de connexion `host=bdd1,bdd2 target_session_attrs=read-write`
+trouve d'elle-même le nouveau primaire. Le script est symétrique : lancé sur bdd1, il la promeut à la place de bdd2.
+
+**Mesures** :
+
+| Mesure | Résultat | Fichier brut |
+|---|---|---|
+| Durée de la promotion (script) | **2 s** (OUEDRAOGO), puis **3 s** à chaque test d'intégration (PORGO) | `bdd_20261023.log`, `integration_bascule_20261023_164927.log`, `reintegration_bdd1_20261023_173638.log` |
+| Retour du service après la fin de la bascule | **5,1 s** : HAProxy attend 2 sondes réussies (`rise 2`, `downinter 2s`) | `integration_bascule_20261023_164927.log` |
+| Commande complète vue de l'hôte | ≈ 10 s, dont ≈ 7 s d'établissement de la session `vagrant ssh` | idem |
+
+**Après la bascule** : remettre bdd1 en service (§ 5.3).
 
 ### 5.3 Remise en service de bdd1 comme nouvelle réplique (PORGO, pour OUEDRAOGO)
 
@@ -267,9 +317,57 @@ Poste de mesure : Intel Core i7-1165G7 (4 cœurs, 8 threads), 15,7 Go de RAM, Wi
 VirtualBox 7.2.6, Vagrant 2.4.9 ; VM Ubuntu 24.04.3 LTS (noyau 6.8), HAProxy 2.8.30, keepalived 2.2.8.
 
 ## 7. Limites connues et ce que nous ferions autrement (tous)
-- Toutes les VM partagent un seul processeur physique : limite des mesures de charge.
-- Bascule de la base manuelle (pas de Patroni), réplication asynchrone.
-- …
+
+| Limite | Conséquence | Ce que nous ferions autrement |
+|---|---|---|
+| Toutes les VM partagent le processeur d'un seul ordinateur | Ajouter des serveurs ne multiplie pas le débit (V3) : les mesures de charge mesurent surtout le partage du CPU | Répartir les VM sur plusieurs hôtes, ou mesurer dans un vrai cloud |
+| Bascule de la base **manuelle** | Le service reste en 503 jusqu'à ce qu'un humain lance `bascule_bdd.sh` | Bascule automatique avec Patroni + etcd (consensus, pas de double primaire) |
+| Réplication **asynchrone** | Perte possible des dernières transactions (RPO > 0) si l'application écrivait | Réplication synchrone (`synchronous_standby_names`) avec une 3e base pour ne pas bloquer les écritures |
+| Fenêtre de **42,7 s** au retour de l'ancien primaire (§ 5.3) | Lectures possiblement périmées pendant cette fenêtre | Condition `ExecStartPre` sur PostgreSQL, ou Patroni |
+| Serveur applicatif **gelé** écarté en ≈ 7 s (`timeout check 3s`, § 3.1) | Au-delà des 5 s pour ce cas précis (les pannes franches restent à ≈ 1,3 s) | Une sonde `/sante` plus rapide, qui n'essaie que les bases joignables |
+| La box `bento/ubuntu-24.04` est amd64 | Impossible de faire tourner la plateforme sur un Mac à processeur ARM (cas d'un membre du groupe) | Prévoir une box arm64 et un fournisseur adapté (ex. VMware Fusion, Parallels) |
+| Une connexion à la base par requête | Coût de connexion à chaque requête (acceptable à notre échelle) | Petit pool de connexions qui se reconnecte, ou PgBouncer |
 
 ## 8. Annexes
-- Arborescence du dépôt, extraits de configuration engendrée (`haproxy.cfg`, `keepalived.conf`).
+
+### 8.1 Arborescence du dépôt
+
+```
+Vagrantfile                  table NOEUDS = source unique de vérité
+.env.exemple                 modèle de configuration (le .env n'est jamais versionné)
+app/app.py                   service HTTP sans état (87 lignes)
+scripts/lib.sh               fonctions communes (apt groupé, idempotence, attente)
+scripts/plateforme.py        lecture de config/plateforme.json
+scripts/commun.sh            socle de toutes les machines
+scripts/lb.sh                HAProxy + keepalived
+scripts/generer_config_lb.py haproxy.cfg et keepalived.conf engendrés
+scripts/app.sh               déploiement du service applicatif
+scripts/bdd.sh               PostgreSQL primaire et jeu de données
+scripts/replique.sh          réplique en flux
+scripts/bascule_bdd.sh       promotion chronométrée
+scripts/reintegrer_bdd.sh    remise en service de l'ancien primaire
+scripts/obs.sh               Prometheus + Grafana (E2)
+tests/                       scénarios V1 à V6, vérifications, résultats bruts
+docs/                        plan de travail, installation, dossier, journal
+```
+
+### 8.2 Extrait de la configuration HAProxy engendrée (N = 2)
+
+```
+defaults
+    retries 2
+    retry-on conn-failure empty-response response-timeout
+    timeout connect 1s
+    timeout check   3s
+    default-server inter 1s fastinter 500ms downinter 2s fall 2 rise 2
+
+backend serveurs_applicatifs
+    balance roundrobin
+    option httpchk
+    http-check send meth GET uri /sante
+    http-check expect status 200
+    server app1 192.168.59.21:3000 check
+    server app2 192.168.59.22:3000 check
+```
+
+Avec `NB_APP=4`, les lignes `server app3 …` et `server app4 …` apparaissent seules, sans autre modification.
