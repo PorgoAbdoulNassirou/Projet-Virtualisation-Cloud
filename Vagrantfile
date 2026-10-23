@@ -60,7 +60,9 @@ raise "NB_APP doit être compris entre 2 et 9 (reçu : #{NB_APP})" unless (2..9)
 RESEAU  = "192.168.#{55 + GROUPE}"
 VIP     = "#{RESEAU}.5"               # IP virtuelle VRRP portée par lb1 ou lb2 (E1)
 BOITE   = "bento/ubuntu-24.04"
-VERSION = "202404.23.0"               # version épinglée, identique pour tout le groupe
+# Version épinglée, identique pour tout le groupe. La 202404.23.0 du squelette
+# de l'énoncé n'est pas publiée pour virtualbox/amd64 : vagrant up échouait.
+VERSION = "202510.26.0"
 
 # --- Source unique de vérité -------------------------------------------------
 NOEUDS = []

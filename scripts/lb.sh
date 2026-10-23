@@ -22,7 +22,10 @@ installer_paquets "${paquets[@]}"
 # --- HAProxy -----------------------------------------------------------------
 OPTIONS=(--ip "$MON_IP")
 # Exportateur Prometheus intégré (utile pour E2), seulement s'il est compilé.
-haproxy -vv 2>/dev/null | grep -qi prometheus && OPTIONS+=(--promex)
+# Sortie capturée d'abord : « haproxy -vv | grep -q » échoue sous pipefail
+# (grep -q ferme le tube, haproxy reçoit SIGPIPE).
+VERSION_HAPROXY=$(haproxy -vv 2>&1 || true)
+[[ "$VERSION_HAPROXY" == *"+PROMEX"* ]] && OPTIONS+=(--promex)
 
 NOUVEAU=$(mktemp)
 python3 /vagrant/scripts/generer_config_lb.py haproxy "${OPTIONS[@]}" > "$NOUVEAU"
