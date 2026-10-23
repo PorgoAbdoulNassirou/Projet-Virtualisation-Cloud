@@ -22,9 +22,16 @@ exec > >(tee -a "$SORTIE") 2>&1
 
 machines() { vagrant status --machine-readable | awk -F, '$3 == "state" && $4 == "running" {print $2}'; }
 
-# Empreinte des fichiers que le provisionnement est susceptible de modifier.
+# Empreinte des fichiers que le provisionnement est susceptible de modifier
+# (socle, répartiteur, application, PostgreSQL), plus le PID des services :
+# un service redémarré pour rien trahirait un provisionnement non idempotent.
+FICHIERS_SURVEILLES="/etc/hosts /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf \
+/opt/resultats-bf/app.py /etc/resultats-bf/app.env /etc/systemd/system/resultats-app.service \
+/etc/postgresql/16/main/pg_hba.conf /etc/postgresql/16/main/conf.d/resultats-bf.conf"
 empreinte() {
-  vagrant ssh "$1" -c "sudo sha256sum /etc/hosts /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf 2>/dev/null" 2>/dev/null | tr -d '\r'
+  vagrant ssh "$1" -c "sudo sha256sum ${FICHIERS_SURVEILLES} 2>/dev/null; \
+    for s in haproxy keepalived resultats-app postgresql@16-main; do \
+      systemctl show -p MainPID --value \$s 2>/dev/null | sed \"s/^/\$s pid /\"; done" 2>/dev/null | tr -d '\r'
 }
 
 r8() {

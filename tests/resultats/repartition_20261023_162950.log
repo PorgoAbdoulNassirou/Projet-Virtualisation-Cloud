@@ -1,0 +1,4 @@
+== Vérification répartition — 23/10/2026 16:29:50 — groupe réseau 192.168.59.0/24
+### R4 — éviction d'un serveur défaillant (app1 arrêté brutalement)
+app1 écarté (DOWN) en 1394 ms → exigence : < 5000 ms
+Résultat brut : tests/resultats/repartition_20261023_162950.log
