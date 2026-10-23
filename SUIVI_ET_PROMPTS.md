@@ -37,10 +37,10 @@ Le détail des tâches et des contrats est dans [docs/PLAN_DE_TRAVAIL.md](docs/P
 
 | Membre | Rôle | Reste à faire |
 |---|---|---|
-| **PORGO Abdoul Nassirou** | Architecte réseau et répartition | Inviter les membres, relire/fusionner les PR, rejouer V6 et R4 avec l'application finale, R1 sur le poste d'un autre membre |
-| **OUEDRAOGO Armand Hendrix** | Ingénieur données | `bdd.sh`, `replique.sh`, `bascule_bdd.sh` (R5, R6, V4) ; rotation sur `app/app.py` |
-| **KOBENDE Pêgdwendé Evrard** | Ingénieur applicatif | `app/app.py`, `scripts/app.sh` ; rotation `tests/v2_panne_app.sh` |
-| **THIOMBIANO Yempabou Romaric Johan** | Ingénieur essais et observabilité | E2 (`obs.sh`, Grafana), V1, V3, V4, V5, assemblage du dossier et du journal ; rotation node_exporter dans `commun.sh` |
+| **PORGO Abdoul Nassirou** | Architecte réseau et répartition | Inviter les membres comme collaborateurs ; relire et fusionner la branche de THIOMBIANO ; répétition de la démo |
+| **OUEDRAOGO Armand Hendrix** | Ingénieur données | ✅ partie fusionnée. Reste : **relire les sections 3.3 et 5.2 du dossier** (rédigées par PORGO à partir de ses scripts) ; **rotation** (commit hors domaine, voir § 5.1) |
+| **KOBENDE Pêgdwendé Evrard** | Ingénieur applicatif | ✅ partie fusionnée et testée. Reste : savoir expliquer l'ensemble en soutenance ; bonus E4 seulement si tout le reste est fini |
+| **THIOMBIANO Yempabou Romaric Johan** | Ingénieur essais et observabilité | **C'est son tour** : E2 (`obs.sh`, Grafana), V1, V3, V4, V5, section 1 et 3.5 du dossier, assemblage du rapport et du journal ; rotation node_exporter dans `commun.sh` |
 
 ---
 
@@ -49,16 +49,11 @@ Le détail des tâches et des contrats est dans [docs/PLAN_DE_TRAVAIL.md](docs/P
 ```
  ÉTAPE 0  PORGO         socle + 1er vagrant up réel (J1)  ✅ FAIT le 23/10
               │
- ÉTAPE 1  OUEDRAOGO     bdd.sh + replique.sh                           ← bloque l'appli et les tests
-    ║     KOBENDE       écrit app.py en parallèle (contrat fixé),
-    ║                   intègre APRÈS la fusion de feat/bdd
-    ║     THIOMBIANO    obs.sh (E2) en parallèle, indépendant
+ ÉTAPE 1  OUEDRAOGO     base, réplication, bascule        ✅ FAIT le 23/10
+ ÉTAPE 2  KOBENDE       application + V2                  ✅ FAIT le 23/10
+          PORGO         intégration, correctifs, R4/V6, remise en service de bdd1  ✅ FAIT le 23/10
               │
- ÉTAPE 2  KOBENDE       app.sh fusionné → V1/V2 possibles (J2)
-          OUEDRAOGO     bascule_bdd.sh → V4 (J3)
-          PORGO         relecture des PR, R4 et V6 rejoués avec l'application finale
-              │
- ÉTAPE 3  THIOMBIANO    campagne V1 à V5, captures Grafana, dossier
+ ÉTAPE 3  THIOMBIANO    E2, campagne V1, V3, V4, V5, captures Grafana, rapport   ← MAINTENANT
               │
  ÉTAPE 4  TOUS          destroy + up sur un poste vierge, répétition de la démo
 ```
@@ -68,7 +63,7 @@ Le détail des tâches et des contrats est dans [docs/PLAN_DE_TRAVAIL.md](docs/P
 | 0 | PORGO | ✅ fait le 23/10 | ✅ poussé dans `main` |
 | 1 | OUEDRAOGO | ✅ fait le 23/10 | ✅ fusionné dans `main` (base, réplication, bascule) |
 | 2 | KOBENDE | ✅ fait le 23/10 | ✅ fusionné dans `main` et testé en VM |
-| 3 | THIOMBIANO | dès le clone (E2) ; mesures après KOBENDE | dim. 25 soir (mesures), lun. 26 (dossier) |
+| 3 | THIOMBIANO | **maintenant** (tout ce dont il dépend est dans `main`) | dim. 25 soir (mesures), lun. 26 matin (rapport) |
 
 **Règle d'or : avant de pousser, `vagrant destroy -f && vagrant up` doit passer sur votre poste.**
 
@@ -124,112 +119,99 @@ ou d'une IA dans les commits ou les pull requests. Explique-moi chaque décision
 la défendre en soutenance.
 ```
 
-### 5.1 OUEDRAOGO Armand Hendrix (étape 1, prioritaire)
+### 5.1 OUEDRAOGO Armand Hendrix (partie fusionnée ; reste : relecture et rotation)
 
 ```text
 Tu travailles sur le dépôt RÉSULTATS-BF (projet Vagrant + VirtualBox, groupe 04, réseau
-192.168.59.0/24). Je suis OUEDRAOGO Armand Hendrix, ingénieur données. Lis d'abord
-SUIVI_ET_PROMPTS.md, docs/PLAN_DE_TRAVAIL.md (fiche 3.3 et contrats § 4, surtout 4.2 et 4.3),
-scripts/lib.sh, scripts/plateforme.py, puis les squelettes scripts/bdd.sh, scripts/replique.sh
-et scripts/bascule_bdd.sh dont les en-têtes contiennent mon contrat.
+192.168.59.0/24). Je suis OUEDRAOGO Armand Hendrix, ingénieur données. Ma partie (bdd.sh,
+replique.sh, bascule_bdd.sh) est fusionnée dans main. PORGO l'a complétée pendant l'intégration :
+reintegrer_bdd.sh (remise en service de bdd1 comme réplique après une bascule), garde-fous dans
+bdd.sh et replique.sh, bascule symétrique, et il a rédigé les sections 3.3 et 5.2 du dossier.
+Commence par `git pull`, puis lis SUIVI_ET_PROMPTS.md, docs/dossier_architecture.md (§ 3.3, 5.2,
+5.3), docs/journal_de_bord.md et mes trois scripts ainsi que scripts/reintegrer_bdd.sh.
 
-Travaille sur une branche feat/bdd et réalise, dans cet ordre :
-1. scripts/bdd.sh (bdd1, primaire) : PostgreSQL 16 d'Ubuntu 24.04 via `installer_paquets`
-   (un seul appel), listen_addresses='*' dans un fichier de conf.d, pg_hba limité au réseau
-   donné par `plateforme valeur reseau` en scram-sha-256 (sans `>>` qui s'accumule), base
-   `resultats`, table resultats(matricule text PRIMARY KEY, nom text, serie text,
-   moyenne numeric(4,2), admis boolean) peuplée de 50 000 lignes par generate_series
-   (matricules BF000001 à BF050000, insertion idempotente), rôle app_resultats (SELECT
-   seulement, mot de passe $PG_MDP_APP), rôle replicateur (REPLICATION, $PG_MDP_REPLICATION),
-   droits de réplication dans pg_hba pour bdd2.
-2. scripts/replique.sh (bdd2) : `attendre_port "$(plateforme ip bdd1)" 5432`, puis
-   pg_basebackup -R -X stream SEULEMENT si standby.signal est absent ; même configuration
-   réseau que bdd1 pour pouvoir être promue.
-3. Vérifier R5 : INSERT sur bdd1 → visible sur bdd2 ; noter la commande exacte et le résultat.
-4. scripts/bascule_bdd.sh : vérifier que bdd1 est injoignable, SELECT pg_promote(), attendre
-   pg_is_in_recovery() = false, afficher début, fin et durée (R6, scénario V4).
-Contraintes : aucune adresse IP en dur (toujours `plateforme ip …`), aucun mot de passe en
-clair, données jamais dans /vagrant, idempotence prouvée par `vagrant provision bdd1` et
-`vagrant provision bdd2` lancés deux fois de suite sans erreur ni changement. Tester avec
-`vagrant destroy -f bdd1 bdd2 && vagrant up bdd1 bdd2`. Mettre E1_LB2=0 et E2_OBS=0 dans .env
-pendant le développement. Rotation obligatoire : ensuite, relis app/app.py et améliore la
-gestion des erreurs de base (target_session_attrs=read-write, connect_timeout) dans un commit
-séparé. Commits en français avec mon identité Git uniquement : n'ajoute JAMAIS de ligne
-Co-Authored-By ni aucune mention de Claude ou d'une IA dans les commits ou les pull requests.
-Pousse la branche et ouvre une pull request vers main. Explique-moi chaque choix pour que je
-puisse le défendre en soutenance.
+1. Explique-moi en détail ces modifications et le mécanisme des lignes de temps (timeline) de
+   PostgreSQL, pour que je puisse les défendre en soutenance.
+2. Relis les sections 3.3 et 5.2 du dossier et corrige ce qui serait inexact.
+3. Rotation obligatoire (commit hors de mon domaine) : propose et réalise une amélioration utile
+   hors de mes scripts, par exemple relire app/app.py et commenter le choix
+   target_session_attrs=read-write, ou ajouter au dossier une entrée de journal.
+Contraintes : aucune adresse IP en dur, aucun secret, idempotence. Commits en français avec mon
+identité Git uniquement : n'ajoute JAMAIS de ligne Co-Authored-By ni aucune mention de Claude ou
+d'une IA dans les commits ou les pull requests. Branche feat/relecture-bdd, puis pull request vers main.
 ```
 
-### 5.2 KOBENDE Pêgdwendé Evrard (étape 1 en parallèle, intégration après OUEDRAOGO)
+### 5.2 KOBENDE Pêgdwendé Evrard (partie fusionnée et testée)
 
 ```text
-Tu travailles sur le dépôt RÉSULTATS-BF (projet Vagrant + VirtualBox, groupe 04, réseau
-192.168.59.0/24). Je suis KOBENDE Pêgdwendé Evrard, ingénieur applicatif. Lis d'abord
-SUIVI_ET_PROMPTS.md, docs/PLAN_DE_TRAVAIL.md (fiche 3.2 et contrats § 4), app/README.md
-(spécification complète de l'application), scripts/lib.sh, scripts/plateforme.py et le
-squelette scripts/app.sh.
-
-Travaille sur une branche feat/app et réalise :
-1. app/app.py : Python 3, moins de 100 lignes, uniquement http.server (ThreadingHTTPServer)
-   et psycopg2. Points d'entrée : GET /resultat?matricule=… (200 JSON, 400, 404, 503),
-   GET /sante (200 seulement si SELECT 1 réussit, 503 sinon, jamais 200 par principe),
-   GET /info ({"serveur": nom d'hôte}). Écoute 0.0.0.0:3000. Aucun état (ni session, ni
-   fichier, ni compteur). Configuration uniquement par PG_HOTES, PG_BASE, PG_UTIL, PG_MDP.
-   Connexion multi-hôtes : host=<bdd1>,<bdd2> … connect_timeout=2 target_session_attrs=read-write.
-   Le service démarre même si la base est absente ; toute erreur de base devient un JSON 503 propre.
-2. scripts/app.sh : `installer_paquets python3-psycopg2`, copie de app.py vers
-   /opt/resultats-bf/, fichier /etc/resultats-bf/app.env en mode 600 construit avec
-   `plateforme ip bdd1` / `plateforme ip bdd2` et $PG_MDP_APP, service systemd resultats-app
-   (Restart=always, utilisateur non root, EnvironmentFile), redémarrage SEULEMENT si app.py
-   ou l'unité a changé (fonction installer_si_change).
-3. Tu peux écrire et tester app.py tout de suite. L'intégration complète se fait APRÈS la
-   fusion de la branche feat/bdd d'OUEDRAOGO : alors `vagrant up`, et vérifier que
-   curl http://192.168.59.5/info alterne entre app1 et app2, et que /sante passe à 503
-   quand bdd1 est arrêtée.
-Contraintes : aucune adresse IP en dur, aucun secret dans le dépôt, idempotence prouvée par
-`vagrant provision app1` lancé deux fois de suite. Mettre E1_LB2=0 et E2_OBS=0 dans .env pendant
-le développement. Rotation obligatoire : écris ensuite tests/v2_panne_app.sh (charge continue
-de curl sur http://192.168.59.5/info, `vagrant halt app1` au bout de 5 s, nombre de requêtes
-perdues et durée de la période dégradée, résultat brut dans tests/resultats/), sur le modèle
-de tests/v6_panne_lb.sh. Commits en français avec mon identité Git uniquement : n'ajoute JAMAIS
-de ligne Co-Authored-By ni aucune mention de Claude ou d'une IA dans les commits ou les pull
-requests. Pousse la branche et ouvre une pull request vers main. Explique-moi chaque ligne
-importante pour que je puisse la défendre en soutenance.
+Tu travailles sur le dépôt RÉSULTATS-BF (projet Vagrant + VirtualBox, groupe 04). Je suis KOBENDE
+Pêgdwendé Evrard, ingénieur applicatif. Ma partie (app/app.py, scripts/app.sh, tests/v2_panne_app.sh)
+est fusionnée et a été testée en VM par PORGO (V2 : 0 requête perdue sur 81). Mon poste est un Mac
+M2 : la box amd64 n'y tourne pas, je ne peux pas lancer les VM. Commence par `git pull`, puis lis
+SUIVI_ET_PROMPTS.md, docs/dossier_architecture.md en entier et docs/journal_de_bord.md.
+Prépare-moi pour la soutenance, où l'enseignant peut m'interroger sur n'importe quelle partie :
+explique-moi le rôle de chaque script, le correctif `timeout check 3s` de HAProxy (§ 3.1) et la
+remise en service de bdd1 (§ 5.3), puis pose-moi 10 questions de soutenance et corrige mes réponses.
+Ne modifie aucun fichier sans me le demander.
 ```
 
-### 5.3 THIOMBIANO Yempabou Romaric Johan (E2 en parallèle, mesures en dernier)
+### 5.3 THIOMBIANO Yempabou Romaric Johan (C'EST SON TOUR : E2, mesures, rapport)
 
 ```text
 Tu travailles sur le dépôt RÉSULTATS-BF (projet Vagrant + VirtualBox, groupe 04, réseau
-192.168.59.0/24). Je suis THIOMBIANO Yempabou Romaric Johan, ingénieur essais et
-observabilité. Lis d'abord SUIVI_ET_PROMPTS.md, docs/PLAN_DE_TRAVAIL.md (fiche 3.4 et
-contrats § 4), tests/README.md, tests/v6_panne_lb.sh (modèle de script de scénario),
-scripts/lib.sh, scripts/plateforme.py, le squelette scripts/obs.sh et docs/dossier_architecture.md.
+192.168.59.0/24, IP virtuelle 192.168.59.5). Je suis THIOMBIANO Yempabou Romaric Johan, ingénieur
+essais et observabilité. Tout le reste est fusionné dans main et testé : réseau et répartition
+(PORGO), base répliquée et bascule (OUEDRAOGO), application (KOBENDE). Commence par `git pull`, puis
+lis SUIVI_ET_PROMPTS.md, docs/INSTALLATION.md, docs/PLAN_DE_TRAVAIL.md (fiche 3.4 et contrats § 4),
+tests/README.md, tests/v6_panne_lb.sh et tests/v2_panne_app.sh (modèles de scripts de scénario),
+scripts/lib.sh, scripts/plateforme.py, scripts/commun.sh, le squelette scripts/obs.sh,
+docs/dossier_architecture.md et docs/journal_de_bord.md.
 
-Partie A, tout de suite, sur une branche feat/obs (extension E2) :
+Faits utiles déjà établis (ne pas les redécouvrir) :
+- Premier `vagrant up` complet : ≈ 25 à 32 min. Vérifier d'abord docs/INSTALLATION.md
+  (VirtualBox 7.2.6, Vagrant 2.4.9, processeur Intel/AMD : un Mac ARM ne fait pas tourner la box).
+- HAProxy expose déjà ses métriques Prometheus sur http://192.168.59.11:8404/metrics (et .12) et sa
+  page de statistiques sur /stats ; il ajoute l'en-tête X-Serveur sur chaque réponse.
+- L'application répond en JSON SANS retour à la ligne final : pour compter les serveurs, utiliser
+  l'en-tête X-Serveur ou ajouter un echo après chaque curl.
+- Sous Git Bash : préfixer `vagrant upload` par MSYS_NO_PATHCONV=1.
+- Après NB_APP=4, mettre NB_APP=4 dans .env (sinon les commandes suivantes ne voient plus app3/app4).
+- Bascule : `vagrant ssh bdd2 -c "sudo bash /vagrant/scripts/bascule_bdd.sh"` ; ensuite
+  `vagrant up bdd1` la remet en service comme réplique (automatique, voir dossier § 5.3).
+- Mesures déjà faites (dossier § 6) : R1 1 934 s, R2 6/6, R3 5/5/5/5, R4 1,28 s, V2 0 perdue / 81,
+  V6 1,70 s, bascule 3 s puis service rétabli 5,1 s après.
+
+Partie A (branche feat/obs) : extension E2.
 1. scripts/obs.sh : Prometheus (paquet apt) dont les cibles sont ENGENDRÉES depuis
-   /vagrant/config/plateforme.json (node_exporter <ip>:9100 de toutes les machines,
-   HAProxy <ip lb>:8404/metrics), aucune adresse en dur. Grafana via le dépôt apt.grafana.com
-   ajouté de façon idempotente, mot de passe admin $GRAFANA_MDP, source de données et
-   tableau de bord provisionnés par fichiers dans config/grafana/ (débit par serveur,
-   serveurs UP/DOWN, CPU par machine). Accès depuis l'hôte : http://192.168.59.41:3000.
-2. Rotation obligatoire : dans scripts/commun.sh, activer le bloc node_exporter déjà préparé
+   /vagrant/config/plateforme.json (node_exporter <ip>:9100 de toutes les machines, HAProxy
+   <ip lb>:8404/metrics), aucune adresse en dur ; Grafana via le dépôt apt.grafana.com ajouté de
+   façon idempotente, mot de passe admin $GRAFANA_MDP, source de données et tableau de bord
+   provisionnés par fichiers dans config/grafana/ (débit par serveur, serveurs UP/DOWN, CPU).
+   Accès depuis l'hôte : http://192.168.59.41:3000. Ajouter les paquets à docs/INSTALLATION.md § 4.
+2. Rotation obligatoire : activer le bloc node_exporter déjà préparé dans scripts/commun.sh
    (commit séparé).
-Partie B, quand l'application et la base sont fusionnées dans main (branche feat/tests) :
-3. tests/v1_repartition.sh (20 appels à /info, comptage par serveur, écart < 20 %),
-   tests/v3_montee_charge.sh (ab -n 2000 -c 50 avec NB_APP=2 puis NB_APP=4, requêtes/s),
-   tests/v4_panne_bdd.sh (halt bdd1, /sante en 503 propre, bascule chronométrée avec
-   scripts/bascule_bdd.sh), tests/v5_reconstruction.sh (durée de destroy -f + up).
-   Chaque script s'exécute depuis l'hôte (Git Bash), lit l'IP virtuelle dans
-   config/plateforme.json et écrit son résultat brut daté dans tests/resultats/.
-4. Remplir docs/dossier_architecture.md (tableau des résultats V1 à V6, captures Grafana
-   pendant V2 et V3, caractéristiques du poste) et docs/journal_de_bord.md.
-Contraintes : mesures réelles uniquement, jamais inventées ; commenter honnêtement (toutes
-les VM partagent un seul processeur, donc doubler N ne double pas le débit). Idempotence de
-obs.sh prouvée par `vagrant provision obs` lancé deux fois. Commits en français avec mon
-identité Git uniquement : n'ajoute JAMAIS de ligne Co-Authored-By ni aucune mention de Claude
-ou d'une IA dans les commits ou les pull requests. Pousse les branches et ouvre des pull
-requests vers main. Explique-moi chaque mesure pour que je puisse la défendre en soutenance.
+3. Idempotence : `vagrant provision obs` deux fois sans changement ; puis
+   `bash tests/verifier_repartition.sh r2`.
+Partie B (branche feat/tests) : scénarios, depuis l'hôte (Git Bash), résultat brut daté dans
+tests/resultats/ pour chacun :
+4. tests/v1_repartition.sh (20 appels, comptage par serveur, écart < 20 %),
+   tests/v3_montee_charge.sh (ab -n 2000 -c 50 sur http://192.168.59.5/resultat?matricule=BF000123
+   avec NB_APP=2 puis NB_APP=4 ; requêtes/s),
+   tests/v4_panne_bdd.sh (halt bdd1, /sante en 503 propre, bascule chronométrée, retour à 200, puis
+   `vagrant up bdd1` et vérification qu'elle est redevenue réplique),
+   tests/v5_reconstruction.sh (durée de destroy -f + up).
+5. Captures Grafana pendant V2 et V3 (débit qui monte, serveur qui disparaît).
+Partie C : rapport.
+6. Remplir docs/dossier_architecture.md : § 1 (contexte), § 3.5 (observabilité), § 6 (V1, V3, V4,
+   V5 : commande exacte, résultat brut, tableau, commentaire honnête : toutes les VM partagent un
+   seul processeur, doubler N ne double pas le débit), et compléter docs/journal_de_bord.md.
+7. Produire le rendu : pandoc docs/dossier_architecture.md -o dossier_architecture.docx
+   (10 à 15 pages) et vérifier la mise en page.
+Contraintes : mesures réelles uniquement, jamais inventées ; aucune IP en dur, aucun secret,
+idempotence. Commits en français avec mon identité Git uniquement : n'ajoute JAMAIS de ligne
+Co-Authored-By ni aucune mention de Claude ou d'une IA dans les commits ou les pull requests.
+Pousse les branches et ouvre des pull requests vers main. Explique-moi chaque mesure pour que je
+puisse la défendre en soutenance.
 ```
 
 ---
@@ -244,7 +226,7 @@ requests vers main. Explique-moi chaque mesure pour que je puisse la défendre e
 - [ ] **1** THIOMBIANO : E2 fusionnée
 - [ ] **3** THIOMBIANO : V1, V3, V4, V5 mesurés ; dossier assemblé
 - [ ] **4** TOUS : `destroy` + `up` sur un poste vierge ; démo répétée ; chacun a lancé chaque scénario
-- [ ] **Rotation** : KOBENDE (v2), OUEDRAOGO (app.py), THIOMBIANO (commun.sh), PORGO (v6)
+- [ ] **Rotation** : [x] KOBENDE (v2), [ ] OUEDRAOGO (§ 5.1), [ ] THIOMBIANO (commun.sh), [x] PORGO (v6)
 
 ---
 

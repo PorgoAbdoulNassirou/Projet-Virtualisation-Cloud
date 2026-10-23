@@ -83,9 +83,10 @@ qu'elle tient.**
 
 **Reste à faire :**
 - [ ] inviter les 3 membres comme collaborateurs du dépôt GitHub ;
-- [ ] relire et fusionner les pull requests des autres (vérifier : aucune IP en dur, aucun secret) ;
-- [ ] **rejouer V6 et R4 avec l'application finale** de KOBENDE (les mesures actuelles utilisent une application de test) ;
-- [ ] `vagrant destroy -f && vagrant up` sur le poste d'un autre membre (R1 sur poste vierge).
+- [x] relire et fusionner les pull requests des autres (vérifier : aucune IP en dur, aucun secret) ;
+- [x] **rejouer V6 et R4 avec l'application finale** de KOBENDE (fait : V6 1,70 s, R4 1,28 s) ;
+- [ ] `vagrant destroy -f && vagrant up` sur le poste d'un autre membre (R1 sur poste vierge ; fait sur le poste de PORGO : 1 934 s).
+- [x] test d'intégration complet et correctifs : `timeout check 3s` (bascule bloquée en 503), remise en service de bdd1 après bascule (`reintegrer_bdd.sh`, § 5.3), sections 3.3, 5.2, 7 et 8 du dossier.
 
 **À savoir expliquer en soutenance :** pourquoi la configuration est engendrée (R3), pourquoi
 `run: "always"` sur le répartiteur, le calcul du délai de détection (`inter 1s`, `fall 2`,
@@ -99,15 +100,15 @@ le fonctionnement de VRRP (priorités 150/100, `advert_int 1`, bascule en ≈ 3 
 **Fichiers :** `app/app.py`, `scripts/app.sh`. **Spécification complète : `app/README.md`.**
 
 **À faire :**
-- [ ] `app/app.py` (< 100 lignes, Python 3, `http.server` + `psycopg2`) : `/resultat`, `/sante`, `/info` ;
-- [ ] `/sante` = vrai `SELECT 1` avec délai court ; 503 si la base ne répond pas ;
-- [ ] **aucun état** ; erreurs de base transformées en JSON 503 ; démarrage possible sans base ;
-- [ ] chaîne de connexion multi-hôtes `host=bdd1,bdd2 … target_session_attrs=read-write` ;
-- [ ] `scripts/app.sh` : `installer_paquets python3-psycopg2`, copie dans `/opt/resultats-bf/`,
+- [x] `app/app.py` (< 100 lignes, Python 3, `http.server` + `psycopg2`) : `/resultat`, `/sante`, `/info` ;
+- [x] `/sante` = vrai `SELECT 1` avec délai court ; 503 si la base ne répond pas ;
+- [x] **aucun état** ; erreurs de base transformées en JSON 503 ; démarrage possible sans base ;
+- [x] chaîne de connexion multi-hôtes `host=bdd1,bdd2 … target_session_attrs=read-write` ;
+- [x] `scripts/app.sh` : `installer_paquets python3-psycopg2`, copie dans `/opt/resultats-bf/`,
       `/etc/resultats-bf/app.env` (mode 600), service systemd `resultats-app` (`Restart=always`,
       utilisateur non root), écoute sur `0.0.0.0:3000` ;
-- [ ] idempotent : copie et rechargement seulement si `app.py` ou l'unité a changé (`installer_si_change`) ;
-- [ ] **rotation** : écrire `tests/v2_panne_app.sh` (charge continue + `vagrant halt app1`,
+- [x] idempotent : copie et rechargement seulement si `app.py` ou l'unité a changé (`installer_si_change`) ;
+- [x] **rotation** : écrire `tests/v2_panne_app.sh` (charge continue + `vagrant halt app1`,
       compte des requêtes perdues, durée de la période dégradée) ;
 - [ ] bonus E4 (seulement si tout est vert) : `scripts/deployer.sh`, mise à jour serveur par serveur
       (`disable server` via le socket HAProxy, mise à jour, `enable server`).
@@ -122,18 +123,18 @@ bdd1 est éteinte, puis 200 après la bascule, sans redémarrer l'application.
 **Fichiers :** `scripts/bdd.sh`, `scripts/replique.sh`, `scripts/bascule_bdd.sh`.
 
 **À faire :**
-- [ ] `bdd.sh` (bdd1) : PostgreSQL 16, `listen_addresses='*'` via `conf.d` (pas de `sed`, pas de `>>`),
+- [x] `bdd.sh` (bdd1) : PostgreSQL 16, `listen_addresses='*'` via `conf.d` (pas de `sed`, pas de `>>`),
       `pg_hba` limité au réseau du groupe, `scram-sha-256` ;
-- [ ] base `resultats`, table `resultats(matricule PK, nom, serie, moyenne, admis)`,
+- [x] base `resultats`, table `resultats(matricule PK, nom, serie, moyenne, admis)`,
       **50 000 lignes** par `generate_series`, matricules `BF000001` … `BF050000`, insertion idempotente ;
-- [ ] rôles `app_resultats` (SELECT) et `replicateur` (REPLICATION), mots de passe
+- [x] rôles `app_resultats` (SELECT) et `replicateur` (REPLICATION), mots de passe
       `$PG_MDP_APP` / `$PG_MDP_REPLICATION` (variables d'environnement, jamais en clair) ;
-- [ ] `replique.sh` (bdd2) : attendre bdd1, puis `pg_basebackup -R -X stream` **seulement si** la machine
+- [x] `replique.sh` (bdd2) : attendre bdd1, puis `pg_basebackup -R -X stream` **seulement si** la machine
       n'est pas déjà une réplique (`standby.signal`) ;
-- [ ] vérifier R5 : `INSERT` sur bdd1 → `SELECT` sur bdd2 (noter la commande et le résultat) ;
-- [ ] `bascule_bdd.sh` : vérification que bdd1 est injoignable, `pg_promote()`, attente de
+- [x] vérifier R5 : `INSERT` sur bdd1 → `SELECT` sur bdd2 (noter la commande et le résultat) ;
+- [x] `bascule_bdd.sh` : vérification que bdd1 est injoignable, `pg_promote()`, attente de
       `pg_is_in_recovery() = false`, affichage de la durée (R6, V4) ;
-- [ ] répertoire de données **jamais** dans `/vagrant` ;
+- [x] répertoire de données **jamais** dans `/vagrant` ;
 - [ ] **rotation** : relire et améliorer la gestion des erreurs de base dans `app/app.py`
       (`target_session_attrs`, délais de connexion) ;
 - [ ] bonus E3 (seulement si tout est vert) : Redis devant la base, gain mesuré et discussion de l'invalidation.
@@ -252,16 +253,16 @@ Règle : au moins **un `vagrant destroy -f && vagrant up` par jour sur un poste 
 ## 8. Liste de contrôle finale (à cocher ensemble le 26 au matin)
 
 **Exigences**
-- [ ] R1 : `vagrant destroy -f && vagrant up` sur un poste vierge, sans aucune commande ensuite
-- [ ] R2 : `vagrant provision` deux fois, aucun changement et aucune erreur
-- [ ] R3 : `NB_APP=4 vagrant up`, 4 serveurs dans les stats HAProxy, aucune IP en dur
-- [ ] R4 : serveur défaillant écarté en moins de 5 s
-- [ ] R5 : écriture sur bdd1 visible sur bdd2
-- [ ] R6 : bascule exécutable et chronométrée
-- [ ] R7 : `git log --all -p -- .env` est vide et `git log --all -p | grep -E 'MDP[A-Z_]*=[^_]'` ne renvoie rien
-- [ ] R8 : seul lb1 a un `forwarded_port` dans le Vagrantfile
+- [x] R1 : `vagrant destroy -f && vagrant up` sur un poste vierge, sans aucune commande ensuite
+- [x] R2 : `vagrant provision` deux fois, aucun changement et aucune erreur
+- [x] R3 : `NB_APP=4 vagrant up`, 4 serveurs dans les stats HAProxy, aucune IP en dur
+- [x] R4 : serveur défaillant écarté en moins de 5 s
+- [x] R5 : écriture sur bdd1 visible sur bdd2
+- [x] R6 : bascule exécutable et chronométrée
+- [x] R7 : `git log --all -p -- .env` est vide et `git log --all -p | grep -E 'MDP[A-Z_]*=[^_]'` ne renvoie rien
+- [x] R8 : seul lb1 a un `forwarded_port` dans le Vagrantfile
 
 **Scénarios** (commande + résultat brut + commentaire dans le dossier)
-- [ ] V1 répartition, [ ] V2 panne app, [ ] V3 charge N=2/N=4, [ ] V4 panne bdd, [ ] V5 reconstruction, [ ] V6 panne lb
+- [ ] V1 répartition, [x] V2 panne app, [ ] V3 charge N=2/N=4, [ ] V4 panne bdd, [ ] V5 reconstruction, [x] V6 panne lb
 
 **Soutenance** : chaque membre a lancé lui-même au moins une fois **chaque** scénario.

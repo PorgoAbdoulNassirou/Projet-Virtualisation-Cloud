@@ -113,6 +113,8 @@ Pendant le développement, mettre `E1_LB2=0` et `E2_OBS=0` pour économiser la m
 | Revenir à 2 serveurs | `vagrant destroy -f app3 app4`, puis `NB_APP=2` dans `.env`, puis `vagrant up` |
 | Rejouer le provisionnement (R2) | `vagrant provision` (deux fois : aucun changement la seconde fois) |
 | Bascule de la base (R6) | `time vagrant ssh bdd2 -c "sudo bash /vagrant/scripts/bascule_bdd.sh"` |
+| Remettre bdd1 en service après une bascule | `vagrant up bdd1` : elle redevient automatiquement réplique de bdd2 (`reintegrer_bdd.sh`) |
+| Vérifier R2, R3, R4, R8 | `bash tests/verifier_repartition.sh tout` |
 | État des machines | `vagrant status` |
 | Se connecter à une machine | `vagrant ssh lb1` |
 
@@ -156,6 +158,7 @@ resultats-bf/
 │   ├── app.sh               # déploiement du service applicatif
 │   ├── bdd.sh / replique.sh # PostgreSQL primaire / réplique
 │   ├── bascule_bdd.sh       # procédure de bascule chronométrée
+│   ├── reintegrer_bdd.sh    # remise en service de l'ancien primaire comme réplique
 │   └── obs.sh               # Prometheus + Grafana
 ├── tests/                   # scénarios V1 à V6 et résultats bruts
 └── docs/                    # plan de travail, dossier d'architecture, journal de bord
