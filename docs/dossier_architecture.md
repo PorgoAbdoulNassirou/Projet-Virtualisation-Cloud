@@ -217,8 +217,6 @@ VirtualBox 7.2.6, Vagrant 2.4.9 ; VM Ubuntu 24.04.3 LTS (noyau 6.8), HAProxy 2.8
 ## 7. Limites connues et ce que nous ferions autrement (tous)
 - Toutes les VM partagent un seul processeur physique : limite des mesures de charge.
 - Bascule de la base manuelle (pas de Patroni), réplication asynchrone.
-- Une connexion à la base par requête : simple et sans état, mais chaque requête paie l'ouverture de
-  connexion. Un petit pool qui se reconnecte serait plus performant sous forte charge (V3).
 - …
 
 ## 8. Annexes
