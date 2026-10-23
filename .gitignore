@@ -1,0 +1,17 @@
+# Secrets locaux (R7) — seul .env.exemple est versionné
+.env
+
+# État local de Vagrant
+.vagrant/
+*-console.log
+
+# Fichiers engendrés par le Vagrantfile à chaque commande (dépendent de NB_APP)
+config/plateforme.json
+config/noeuds.yml
+
+# Divers
+__pycache__/
+*.pyc
+.vscode/
+.idea/
+~$*

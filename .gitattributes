@@ -1,0 +1,19 @@
+# Piège connu : un script CRLF écrit sous Windows échoue dans la VM.
+# Tout fichier texte est stocké et extrait avec des fins de ligne LF.
+* text=auto eol=lf
+
+*.sh        text eol=lf
+*.py        text eol=lf
+*.js        text eol=lf
+*.yml       text eol=lf
+*.json      text eol=lf
+*.cfg       text eol=lf
+*.conf      text eol=lf
+*.md        text eol=lf
+Vagrantfile text eol=lf
+.env*       text eol=lf
+
+*.png  binary
+*.jpg  binary
+*.pdf  binary
+*.docx binary
