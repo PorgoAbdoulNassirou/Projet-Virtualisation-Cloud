@@ -45,12 +45,17 @@ ce fichier. Aucune adresse n'est écrite en dur ailleurs.
 
 ## Prérequis
 
-| Outil | Version | Remarque |
+**Guide complet, avec les commandes d'installation : [docs/INSTALLATION.md](docs/INSTALLATION.md).**
+
+| Outil | Version (testée) | Remarque |
 |---|---|---|
-| VirtualBox | 7.x | Activer la virtualisation (VT-x/AMD-V) dans le BIOS |
-| Vagrant | dernière version 2.4.x | Une version trop ancienne peut refuser la version installée de VirtualBox |
-| Git | 2.x | Sous Windows, Git Bash fournit `bash` et `curl` pour les tests |
-| Mémoire | 8 Go | Socle seul ≈ 3 Go ; avec E1 + E2 ≈ 4,3 Go |
+| VirtualBox | **7.2.6** | Activer la virtualisation (VT-x/AMD-V) dans le BIOS |
+| Vagrant | **2.4.9** | Couple VirtualBox/Vagrant validé le 23/10/2026 |
+| Git (Git Bash) | dernière | Git Bash fournit `bash`, `curl`, `sed`, `awk` pour les scripts de `tests/` |
+| Apache Bench `ab` | 2.4 | Scénario V3 uniquement (voir le guide) |
+| Mémoire | 8 Go minimum | Socle seul ≈ 3 Go ; avec E1 + E2 ≈ 4,3 Go |
+
+Rien n'est à installer dans les machines virtuelles : tout est fait par les scripts de provisionnement.
 
 La boîte `bento/ubuntu-24.04` (version épinglée `202510.26.0`) est téléchargée automatiquement au
 premier lancement (≈ 1 Go). Aucun compte cloud ni ressource payante n'est nécessaire.

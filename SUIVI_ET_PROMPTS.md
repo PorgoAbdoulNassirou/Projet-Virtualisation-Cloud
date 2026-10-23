@@ -72,7 +72,9 @@ Le détail des tâches et des contrats est dans [docs/PLAN_DE_TRAVAIL.md](docs/P
 
 ## 4. Préparation commune (à faire par chacun, une seule fois)
 
-1. Installer **VirtualBox 7.x** et la **dernière version de Vagrant 2.4.x**, puis **Git** et **Claude Code**.
+1. Installer les outils en suivant **[docs/INSTALLATION.md](docs/INSTALLATION.md)** : VirtualBox **7.2.6**,
+   Vagrant **2.4.9**, Git, Claude Code (commandes `winget` prêtes à copier). THIOMBIANO installe en plus
+   Apache Bench (`ab`) et Pandoc. **Tout nouvel outil ou paquet doit être ajouté à ce guide.**
 2. Configurer Git **avec son propre nom** (l'historique prouve qui a fait quoi) :
    ```bash
    git config --global user.name  "Prénom NOM"
@@ -239,3 +241,16 @@ requests vers main. Explique-moi chaque mesure pour que je puisse la défendre e
 - [ ] **3** THIOMBIANO : V1, V3, V4, V5 mesurés ; dossier assemblé
 - [ ] **4** TOUS : `destroy` + `up` sur un poste vierge ; démo répétée ; chacun a lancé chaque scénario
 - [ ] **Rotation** : KOBENDE (v2), OUEDRAOGO (app.py), THIOMBIANO (commun.sh), PORGO (v6)
+
+---
+
+## 7. Livrables à rendre le 26 octobre (énoncé, § 8)
+
+| Code | Livrable | Forme | Responsable | Fichier |
+|---|---|---|---|---|
+| L1 | Dépôt Git | Vagrantfile, scripts/, app/, config/, README.md, .env.exemple ; commits de **chaque** membre | PORGO | ce dépôt |
+| L2 | **Dossier d'architecture (le rapport)** | **10 à 15 pages** : contexte, architecture et justification des choix, schéma, procédures d'exploitation, résultats V1 à V6 en tableaux, limites | THIOMBIANO assemble, chacun rédige ses sections | `docs/dossier_architecture.md` → `.docx`/`.pdf` |
+| L3 | Journal de bord | **1 à 2 pages** : rôles, décisions et pourquoi, difficultés et solutions | tous | `docs/journal_de_bord.md` |
+| L4 | Démonstration | **20 min** sur machine vierge : destruction, reconstruction, 3 scénarios tirés au sort | tous | — |
+
+Conversion du rapport pour le rendu : `pandoc docs/dossier_architecture.md -o dossier_architecture.docx`
