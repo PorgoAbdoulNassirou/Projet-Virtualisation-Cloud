@@ -1,0 +1,31 @@
+Résultats réels — réplication PostgreSQL et promotion
+Date : 2026-10-23 (VM en UTC)
+
+R5 — réplication
+Commande sur bdd1 :
+  INSERT INTO resultats VALUES ('TEST000001','Test','A',12.50,true)
+  ON CONFLICT (matricule) DO UPDATE SET nom=EXCLUDED.nom;
+Résultat bdd1 : INSERT 0 1
+
+Commande sur bdd2 :
+  SELECT matricule, nom, serie, moyenne, admis FROM resultats
+  WHERE matricule = 'TEST000001';
+Résultat bdd2 :
+  TEST000001 | Test | A | 12.50 | t
+Nettoyage sur bdd1 : DELETE FROM resultats WHERE matricule = 'TEST000001';
+Résultat : DELETE 1 (la suppression est répliquée vers bdd2).
+
+Idempotence — vagrant provision bdd1, bdd2, bdd1, bdd2
+Résultat : les quatre provisions ont terminé avec le code 0 ; bdd2 est restée
+en récupération (standby.signal présent), sans refaire pg_basebackup.
+Comptage annoncé par le provisionnement bdd1 : 50000 lignes.
+
+R6 — promotion (bdd1 arrêtée)
+Commande : vagrant halt bdd1
+Commande : vagrant ssh bdd2 -c "sudo bash /vagrant/scripts/bascule_bdd.sh"
+Sortie observée :
+  début de bascule : 2026-10-23T14:15:14+00:00
+  fin de bascule   : 2026-10-23T14:15:16+00:00
+  durée            : 2 s
+La procédure a terminé avec le code 0. bdd1 est laissée arrêtée pour éviter
+de redémarrer l'ancien primaire après la promotion de bdd2.

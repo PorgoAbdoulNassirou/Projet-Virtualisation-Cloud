@@ -1,20 +1,34 @@
 #!/usr/bin/env bash
-# =============================================================================
-# Procédure de bascule de la base (R6, scénario V4) — chronométrée
-# Responsable : OUEDRAOGO Armand Hendrix (ingénieur données)
-#
-# Exécution (depuis l'hôte, à la racine du dépôt) :
-#   time vagrant ssh bdd2 -c "sudo bash /vagrant/scripts/bascule_bdd.sh"
-#
-# CONTRAT :
-#   1. vérifier que bdd1 est réellement injoignable (éviter deux primaires)
-#   2. promouvoir bdd2 : sudo -u postgres psql -c "SELECT pg_promote();"
-#   3. attendre que pg_is_in_recovery() renvoie false
-#   4. afficher l'heure de début, de fin et la durée en secondes
-# Les applications n'ont RIEN à changer : leur chaîne de connexion liste
-# bdd1 ET bdd2 avec target_session_attrs=read-write (voir contrat applicatif).
-# =============================================================================
 set -euo pipefail
 source /vagrant/scripts/lib.sh
 
-journal "TODO (OUEDRAOGO) : procédure de bascule"
+primaire=$(plateforme ip bdd1)
+debut_epoch=$(date +%s)
+debut=$(date --iso-8601=seconds)
+journal "début de bascule : $debut"
+
+# Ne jamais promouvoir si l'ancien primaire accepte encore des connexions : cela
+# évite de créer deux nœuds inscriptibles lors d'un simple incident réseau local.
+if timeout 2 bash -c "exec 3<>/dev/tcp/${primaire}/5432" 2>/dev/null; then
+  journal "ÉCHEC : bdd1 ($primaire:5432) est encore joignable, promotion annulée"
+  exit 1
+fi
+
+if [ "$(sudo -u postgres psql -P pager=off -tAc 'SELECT pg_is_in_recovery()')" = "t" ]; then
+  sudo -u postgres psql -P pager=off -v ON_ERROR_STOP=1 -c "SELECT pg_promote(true, 60)"
+fi
+
+delai=${1:-120}
+debut_attente=$SECONDS
+until [ "$(sudo -u postgres psql -P pager=off -tAc 'SELECT pg_is_in_recovery()' 2>/dev/null || true)" = "f" ]; do
+  if (( SECONDS - debut_attente >= delai )); then
+    journal "ÉCHEC : bdd2 n'est pas devenue primaire après ${delai} s"
+    exit 1
+  fi
+  sleep 1
+done
+
+fin_epoch=$(date +%s)
+fin=$(date --iso-8601=seconds)
+journal "fin de bascule : $fin"
+journal "durée : $((fin_epoch - debut_epoch)) s"
