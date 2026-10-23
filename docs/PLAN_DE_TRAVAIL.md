@@ -70,14 +70,22 @@ qu'elle tient.**
 - [x] statistiques HAProxy et métriques Prometheus sur `http://<ip lb>:8404` (réseau privé) ;
 - [x] script du scénario V6 (`tests/v6_panne_lb.sh`), **commit hors domaine**.
 
+**Validé sur de vraies VM le 23/10 (mesures dans `tests/resultats/`) :**
+- [x] dépôt GitHub créé et poussé ;
+- [x] **J1** : `vagrant up` complet réussi (1 433 s, téléchargement de la box inclus) ;
+- [x] R2 : `vagrant provision` ×2 sur les 6 VM → empreintes identiques ;
+- [x] R3 : `NB_APP=4` → 4 serveurs UP, répartition 5/5/5/5 ; retour à 2 exécuté ;
+- [x] R4 : serveur défaillant écarté en 1 037 ms ;
+- [x] R8 : seul lb1 expose un port (80 → 8080) ;
+- [x] V6 : 1 requête perdue sur 122, interruption réelle 1,73 s ; panne de HAProxy seul → lb2 maître en 2,59 s ;
+- [x] script de vérification `tests/verifier_repartition.sh` (R2, R3, R4, R8) ;
+- [x] dossier : sections 2, 3.1, 3.4, 4, 5.1, 5.4 et mesures du § 6 rédigées.
+
 **Reste à faire :**
-- [ ] créer le dépôt GitHub et y inviter les 3 membres (voir § 7) ;
-- [ ] **J1** : `vagrant up` complet sur son poste, puis sur le poste d'un autre membre ;
-- [ ] tester R3 : `NB_APP=4 vagrant up` puis vérifier `http://<ip lb1>:8404/stats` (4 serveurs) ;
-- [ ] tester R2 : `vagrant provision lb1` deux fois → « HAProxy inchangé », « keepalived inchangé » ;
-- [ ] exécuter V6 et fournir le résultat brut à THIOMBIANO ;
-- [ ] rédiger dans le dossier : plan d'adressage, schéma, justification de HAProxy et de VRRP,
-      procédure « ajouter un serveur ».
+- [ ] inviter les 3 membres comme collaborateurs du dépôt GitHub ;
+- [ ] relire et fusionner les pull requests des autres (vérifier : aucune IP en dur, aucun secret) ;
+- [ ] **rejouer V6 et R4 avec l'application finale** de KOBENDE (les mesures actuelles utilisent une application de test) ;
+- [ ] `vagrant destroy -f && vagrant up` sur le poste d'un autre membre (R1 sur poste vierge).
 
 **À savoir expliquer en soutenance :** pourquoi la configuration est engendrée (R3), pourquoi
 `run: "always"` sur le répartiteur, le calcul du délai de détection (`inter 1s`, `fall 2`,

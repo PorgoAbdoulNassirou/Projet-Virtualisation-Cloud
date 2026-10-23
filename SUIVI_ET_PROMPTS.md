@@ -13,23 +13,27 @@ Le détail des tâches et des contrats est dans [docs/PLAN_DE_TRAVAIL.md](docs/P
 
 | Élément | Fichiers | Fait par | État |
 |---|---|---|---|
-| Plan d'adressage, table des machines (source unique de vérité), `NB_APP` paramétrable | `Vagrantfile` | PORGO Abdoul Nassirou | ✅ écrit |
-| Secrets : `.env` auto-généré, `.env.exemple`, `.gitignore`, `.gitattributes` (LF) | racine | PORGO Abdoul Nassirou | ✅ écrit |
-| Bibliothèque commune, lecture de `plateforme.json`, socle commun idempotent | `scripts/lib.sh`, `scripts/plateforme.py`, `scripts/commun.sh` | PORGO Abdoul Nassirou | ✅ écrit |
-| HAProxy engendré, sonde `/sante` (< 5 s), rejeu des requêtes, statistiques | `scripts/lb.sh`, `scripts/generer_config_lb.py` | PORGO Abdoul Nassirou | ✅ écrit |
-| Extension E1 : lb2 + keepalived, IP virtuelle `192.168.59.5` | `scripts/lb.sh`, `scripts/generer_config_lb.py` | PORGO Abdoul Nassirou | ✅ écrit |
-| Scénario V6 (panne du répartiteur) | `tests/v6_panne_lb.sh` | PORGO Abdoul Nassirou | ✅ écrit |
+| Plan d'adressage, table des machines (source unique de vérité), `NB_APP` paramétrable | `Vagrantfile` | PORGO Abdoul Nassirou | ✅ validé en VM |
+| Secrets : `.env` auto-généré, `.env.exemple`, `.gitignore`, `.gitattributes` (LF) | racine | PORGO Abdoul Nassirou | ✅ validé en VM |
+| Bibliothèque commune, lecture de `plateforme.json`, socle commun idempotent | `scripts/lib.sh`, `scripts/plateforme.py`, `scripts/commun.sh` | PORGO Abdoul Nassirou | ✅ validé en VM |
+| HAProxy engendré, sonde `/sante` (< 5 s), rejeu des requêtes, statistiques | `scripts/lb.sh`, `scripts/generer_config_lb.py` | PORGO Abdoul Nassirou | ✅ validé en VM |
+| Extension E1 : lb2 + keepalived, IP virtuelle `192.168.59.5` | `scripts/lb.sh`, `scripts/generer_config_lb.py` | PORGO Abdoul Nassirou | ✅ validé en VM |
+| Scénario V6 (panne du répartiteur) : 1 requête perdue / 122, interruption 1,73 s | `tests/v6_panne_lb.sh` | PORGO Abdoul Nassirou | ✅ mesuré |
+| Vérification R2 (6/6 identiques), R3 (4 serveurs, 5/5/5/5), R4 (1 037 ms), R8 | `tests/verifier_repartition.sh`, `tests/resultats/` | PORGO Abdoul Nassirou | ✅ mesuré |
+| Sections 2, 3.1, 3.4, 4, 5.1, 5.4 et mesures du dossier, journal de bord | `docs/dossier_architecture.md`, `docs/journal_de_bord.md` | PORGO Abdoul Nassirou | ✅ rédigé |
 | README, plan de travail, modèles du dossier et du journal | `README.md`, `docs/` | PORGO Abdoul Nassirou | ✅ écrit |
 | Squelettes et contrats des autres rôles | `scripts/bdd.sh`, `replique.sh`, `bascule_bdd.sh`, `app.sh`, `obs.sh`, `app/README.md`, `tests/README.md` | PORGO Abdoul Nassirou | ✅ squelettes, **à remplir** |
 
-> ⚠️ **Rien n'a encore été exécuté dans de vraies VM.** Le premier `vagrant up` complet (jalon J1) est
-> la priorité absolue de PORGO.
+> ✅ **Jalon J1 atteint le 23/10** : `vagrant up` complet réussi sur le poste de PORGO (box `bento/ubuntu-24.04`
+> **202510.26.0** : la version 202404.23.0 de l'énoncé n'existe pas). Le répartiteur a été testé avec une
+> application de test temporaire ; HAProxy renverra 503 tant que l'application réelle n'est pas fusionnée,
+> c'est normal.
 
 ## 2. Ce qui reste à faire, et par qui
 
 | Membre | Rôle | Reste à faire |
 |---|---|---|
-| **PORGO Abdoul Nassirou** | Architecte réseau et répartition | J1 (`vagrant up` réel), tests R2/R3/R8, V6, sections 2, 3.1, 3.4, 4, 5.1, 5.4 du dossier |
+| **PORGO Abdoul Nassirou** | Architecte réseau et répartition | Inviter les membres, relire/fusionner les PR, rejouer V6 et R4 avec l'application finale, R1 sur le poste d'un autre membre |
 | **OUEDRAOGO Armand Hendrix** | Ingénieur données | `bdd.sh`, `replique.sh`, `bascule_bdd.sh` (R5, R6, V4) ; rotation sur `app/app.py` |
 | **KOBENDE Pêgdwendé Evrard** | Ingénieur applicatif | `app/app.py`, `scripts/app.sh` ; rotation `tests/v2_panne_app.sh` |
 | **THIOMBIANO Yempabou Romaric Johan** | Ingénieur essais et observabilité | E2 (`obs.sh`, Grafana), V1, V3, V4, V5, assemblage du dossier et du journal ; rotation node_exporter dans `commun.sh` |
@@ -39,7 +43,7 @@ Le détail des tâches et des contrats est dans [docs/PLAN_DE_TRAVAIL.md](docs/P
 ## 3. Ordre de passage (qui travaille avant qui)
 
 ```
- ÉTAPE 0  PORGO         push du socle + 1er vagrant up réel (J1)       ← bloque tout le monde
+ ÉTAPE 0  PORGO         socle + 1er vagrant up réel (J1)  ✅ FAIT le 23/10
               │
  ÉTAPE 1  OUEDRAOGO     bdd.sh + replique.sh                           ← bloque l'appli et les tests
     ║     KOBENDE       écrit app.py en parallèle (contrat fixé),
@@ -48,7 +52,7 @@ Le détail des tâches et des contrats est dans [docs/PLAN_DE_TRAVAIL.md](docs/P
               │
  ÉTAPE 2  KOBENDE       app.sh fusionné → V1/V2 possibles (J2)
           OUEDRAOGO     bascule_bdd.sh → V4 (J3)
-          PORGO         R3 (NB_APP=4), R2, V6
+          PORGO         relecture des PR, R4 et V6 rejoués avec l'application finale
               │
  ÉTAPE 3  THIOMBIANO    campagne V1 à V5, captures Grafana, dossier
               │
@@ -57,7 +61,7 @@ Le détail des tâches et des contrats est dans [docs/PLAN_DE_TRAVAIL.md](docs/P
 
 | Ordre | Qui | Peut commencer | Doit avoir fusionné avant |
 |---|---|---|---|
-| 0 | PORGO | maintenant | ven. 23 au soir |
+| 0 | PORGO | ✅ fait le 23/10 | ✅ poussé dans `main` |
 | 1 | OUEDRAOGO | dès le clone | **sam. 24 midi** (`bdd.sh` + `replique.sh`), dim. 25 midi (bascule) |
 | 2 | KOBENDE | dès le clone (écriture) ; intégration après OUEDRAOGO | sam. 24 soir |
 | 3 | THIOMBIANO | dès le clone (E2) ; mesures après KOBENDE | dim. 25 soir (mesures), lun. 26 (dossier) |
@@ -89,31 +93,29 @@ Le détail des tâches et des contrats est dans [docs/PLAN_DE_TRAVAIL.md](docs/P
 
 Chaque prompt se colle **tel quel** dans Claude Code, ouvert à la racine du dépôt cloné.
 
-### 5.0 PORGO Abdoul Nassirou (étape 0)
+### 5.0 PORGO Abdoul Nassirou (étape 0 faite ; suite : intégration)
 
 ```text
 Tu travailles sur le dépôt RÉSULTATS-BF (projet Vagrant, groupe 04, réseau 192.168.59.0/24).
-Je suis PORGO Abdoul Nassirou, architecte réseau et répartition. Ma partie est écrite mais n'a
-jamais tourné dans de vraies VM. Lis d'abord SUIVI_ET_PROMPTS.md, docs/PLAN_DE_TRAVAIL.md
-(fiche 3.1 et contrats § 4), le Vagrantfile, scripts/lib.sh, scripts/commun.sh, scripts/lb.sh
-et scripts/generer_config_lb.py.
+Je suis PORGO Abdoul Nassirou, architecte réseau et répartition. Ma partie est faite et validée
+en VM le 23/10 (J1, R2, R3, R4, R8, V6 : voir tests/resultats/ et docs/dossier_architecture.md § 6).
+Lis d'abord SUIVI_ET_PROMPTS.md, docs/PLAN_DE_TRAVAIL.md (fiche 3.1 et contrats § 4), le
+Vagrantfile, scripts/lib.sh, scripts/lb.sh, scripts/generer_config_lb.py, tests/verifier_repartition.sh
+et tests/v6_panne_lb.sh.
 
-Objectif : valider ma partie en conditions réelles, dans cet ordre.
-1. J1 : lancer `vagrant up` et corriger toute erreur dans MES fichiers jusqu'à ce qu'il passe
-   de bout en bout (les squelettes des autres rôles affichent TODO, c'est normal ; HAProxy
-   répondra 503 tant que l'application n'existe pas).
-2. Vérifier sur lb1 : `haproxy -c -f /etc/haproxy/haproxy.cfg`, page http://192.168.59.11:8404/stats,
-   `ip addr` montre l'IP virtuelle 192.168.59.5 sur lb1 (E1).
-3. R2 : `vagrant provision lb1` deux fois → la 2e fois « HAProxy inchangé » et « keepalived inchangé ».
-4. R3 : `NB_APP=4 vagrant up` → 4 serveurs dans les stats, sans modifier aucun autre fichier.
-5. R8 : seul lb1 a un forwarded_port.
-6. Quand l'application et la base seront fusionnées : lancer `bash tests/v6_panne_lb.sh`
-   et garder le fichier brut de tests/resultats/.
-Contraintes : aucune adresse IP en dur, aucun secret dans le dépôt, scripts idempotents,
-fins de ligne LF. Ne modifie pas les fichiers des autres rôles. Commits en français, avec
-mon identité Git uniquement : n'ajoute JAMAIS de ligne Co-Authored-By ni aucune mention de
-Claude ou d'une IA dans les commits ou les pull requests. Explique-moi chaque correction pour
-que je puisse la défendre en soutenance.
+Mon rôle maintenant : intégrateur.
+1. Pour chaque pull request des autres membres : vérifier qu'aucune IP n'est écrite en dur
+   (toujours `plateforme ip …`), qu'aucun secret n'apparaît dans le diff, que les scripts sont
+   idempotents (`vagrant provision <machine>` deux fois) ; me dire ce qui bloque avant que je fusionne.
+2. Quand app.py et app.sh de KOBENDE sont fusionnés : `vagrant up`, puis rejouer
+   `bash tests/verifier_repartition.sh r4` et `DUREE=45 bash tests/v6_panne_lb.sh` avec
+   l'application finale, et mettre à jour les chiffres du § 6 du dossier (garder les fichiers bruts).
+3. R1 sur poste vierge : guider un autre membre pour `vagrant destroy -f && vagrant up` sur son poste.
+Contraintes : aucune adresse IP en dur, aucun secret dans le dépôt, scripts idempotents, fins de
+ligne LF. Sous Git Bash, préfixer `vagrant upload` par MSYS_NO_PATHCONV=1. Commits en français, avec
+mon identité Git uniquement : n'ajoute JAMAIS de ligne Co-Authored-By ni aucune mention de Claude
+ou d'une IA dans les commits ou les pull requests. Explique-moi chaque décision pour que je puisse
+la défendre en soutenance.
 ```
 
 ### 5.1 OUEDRAOGO Armand Hendrix (étape 1, prioritaire)
@@ -228,11 +230,11 @@ requests vers main. Explique-moi chaque mesure pour que je puisse la défendre e
 
 ## 6. Suivi (chacun coche quand sa branche est fusionnée dans `main`)
 
-- [ ] **0** PORGO : J1 `vagrant up` réel validé
+- [x] **0** PORGO : J1 `vagrant up` réel validé
 - [ ] **1** OUEDRAOGO : `bdd.sh` + `replique.sh` fusionnés (R5)
 - [ ] **2** KOBENDE : `app.py` + `app.sh` fusionnés (V1, V2 possibles, J2)
 - [ ] **2** OUEDRAOGO : `bascule_bdd.sh` fusionné (V4, J3)
-- [ ] **2** PORGO : R2, R3, R8 vérifiés ; V6 mesuré
+- [x] **2** PORGO : R2, R3, R4, R8 vérifiés ; V6 mesuré (à rejouer avec l'application finale)
 - [ ] **1** THIOMBIANO : E2 fusionnée
 - [ ] **3** THIOMBIANO : V1, V3, V4, V5 mesurés ; dossier assemblé
 - [ ] **4** TOUS : `destroy` + `up` sur un poste vierge ; démo répétée ; chacun a lancé chaque scénario

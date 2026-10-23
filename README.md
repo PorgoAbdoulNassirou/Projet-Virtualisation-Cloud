@@ -52,7 +52,7 @@ ce fichier. Aucune adresse n'est écrite en dur ailleurs.
 | Git | 2.x | Sous Windows, Git Bash fournit `bash` et `curl` pour les tests |
 | Mémoire | 8 Go | Socle seul ≈ 3 Go ; avec E1 + E2 ≈ 4,3 Go |
 
-La boîte `bento/ubuntu-24.04` (version épinglée `202404.23.0`) est téléchargée automatiquement au
+La boîte `bento/ubuntu-24.04` (version épinglée `202510.26.0`) est téléchargée automatiquement au
 premier lancement (≈ 1 Go). Aucun compte cloud ni ressource payante n'est nécessaire.
 
 ---
@@ -168,6 +168,9 @@ resultats-bf/
 | VirtualBox très lent sous Windows | Hyper-V/WSL2 actif (ex. Docker Desktop) : VirtualBox fonctionne, mais plus lentement |
 | Le provisionnement attend « Could not get lock » | unattended-upgrades tourne au démarrage : `installer_paquets` patiente jusqu'à 5 min |
 | HAProxy renvoie 503 | Aucune application ne répond 200 sur `/sante` : `vagrant ssh app1 -c "curl -s localhost:3000/sante"` |
+| `timeout during server version negotiating` | VM figée, souvent faute de RAM sur l'hôte : `vagrant reload <machine>`, fermer les applications lourdes, `E2_OBS=0` pendant le développement |
+| `vagrant upload f /tmp/x` envoie au mauvais endroit (Git Bash) | Git Bash convertit les chemins : `MSYS_NO_PATHCONV=1 vagrant upload …` |
+| Après `NB_APP=4`, `vagrant ssh app3` répond « machine not found » | Toute commande doit voir la même valeur : mettre `NB_APP=4` dans `.env` plutôt que dans le shell |
 
 ---
 
