@@ -52,10 +52,17 @@ defaults
     timeout connect 1s
     timeout client  30s
     timeout server  5s
-    timeout check   1s
+    # Lecture de la réponse de /sante : 3 s. Après une bascule de la base,
+    # libpq essaie d'abord bdd1 (éteinte) puis bdd2 : /sante répond 200 en
+    # 0,6 à 2,1 s. Avec 1 s, la sonde rejetait des serveurs sains (L7TOUT) et
+    # le service restait en 503. La connexion de la sonde reste bornée par
+    # « timeout connect » (1 s) : un serveur éteint est toujours écarté vite.
+    timeout check   3s
     # R4 : sonde toutes les secondes, serveur écarté après 2 échecs (< 5 s),
     # réintégré après 2 succès.
     default-server inter 1s fastinter 500ms downinter 2s fall 2 rise 2
+    # Plus aucun serveur disponible : 503 en JSON, comme l'application.
+    http-error status 503 content-type "application/json; charset=utf-8" string "{{\\"erreur\\": \\"aucun serveur applicatif disponible\\"}}"
 
 frontend entree_http
     bind *:80
