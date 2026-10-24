@@ -1,0 +1,28 @@
+V1 — 24/10/2026 15:58:56 — 20 appels à http://192.168.59.5/info, serveurs attendus : app1 app2 app3 app4 
+1 200 app1
+2 200 app2
+3 200 app3
+4 200 app4
+5 200 app1
+6 200 app2
+7 200 app3
+8 200 app4
+9 200 app1
+10 200 app2
+11 200 app3
+12 200 app4
+13 200 app1
+14 200 app2
+15 200 app3
+16 200 app4
+17 200 app1
+18 200 app2
+19 200 app3
+20 200 app4
+Ordre des réponses : app1 app2 app3 app4 app1 app2 app3 app4 app1 app2 app3 app4 app1 app2 app3 app4 app1 app2 app3 app4
+  app1   : 5 appel(s)
+  app2   : 5 appel(s)
+  app3   : 5 appel(s)
+  app4   : 5 appel(s)
+Appels en échec (≠ 200) : 0
+Écart (max − min) / part attendue (5.0) : 0.0 % → exigence < 20 % : SATISFAITE

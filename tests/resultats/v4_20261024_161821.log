@@ -1,0 +1,30 @@
+V4 — 24/10/2026 16:18:21 — sonde http://192.168.59.5/sante toutes les 500 ms
+Avant : bdd1 pg_is_in_recovery = f, bdd2 = t (attendu : f / t)
+Avant : /sante → {"etat": "ok", "serveur": "app1"} [200]
+1792858726972 vagrant halt bdd1
+1792858805623 bdd1 arrêtée (78 s d'arrêt propre)
+Pendant la panne, via l'IP virtuelle :
+  /sante    → {"erreur": "aucun serveur applicatif disponible"} [503]
+  /resultat → {"erreur": "aucun serveur applicatif disponible"} [503]
+1792858808778 lancement de bascule_bdd.sh sur bdd2
+== [bdd2] début de bascule : 2026-10-24T16:20:12+00:00
+== [bdd2] fin de bascule : 2026-10-24T16:20:15+00:00
+== [bdd2] durée : 3 s
+1792858820937 fin de la commande de bascule (12 s, session vagrant ssh comprise)
+1792858825932 /sante = 200 : service rétabli 4995 ms après la fin de la bascule
+Après : /resultat → {"matricule": "BF000123", "nom": "Eleve 000123", "serie": "C", "moyenne": 5.49, "admis": false, "serveur": "app1"} [200]
+
+===== Analyse de la sonde (tests/resultats/v4_20261024_161821_sonde.log) =====
+Sondes : 160 — 200 : 30  503 : 130  
+Interruption vue des utilisateurs (1er non-200 → retour à 200) : 79.1 s
+Réponses brutes sans code HTTP (page blanche, connexion refusée) : 0
+
+===== Remise en service de bdd1 (vagrant up bdd1) =====
+    bdd1: == [bdd1] paquets déjà présents : python3 curl ca-certificates prometheus-node-exporter
+    bdd1: == [bdd1] socle commun prêt
+    bdd1: == [bdd1] ANCIEN PRIMAIRE détecté (ligne de temps 1 < 2 sur bdd2) : conversion en réplique
+    bdd1: == [bdd1] réplique de bdd2 : réception du flux « streaming », en 25 s
+vagrant up bdd1 : 129 s (démarrage de la VM compris)
+Après : bdd1 pg_is_in_recovery = t, bdd2 = f (attendu : t / f)
+Après : /sante → {"etat": "ok", "serveur": "app2"} [200]
+Résultat brut : tests/resultats/v4_20261024_161821.log et tests/resultats/v4_20261024_161821_sonde.log
