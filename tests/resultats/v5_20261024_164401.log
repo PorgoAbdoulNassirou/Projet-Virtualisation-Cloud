@@ -1,0 +1,9 @@
+V5 — 24/10/2026 16:44:01 — vagrant destroy -f puis vagrant up
+Paramètres : GROUPE=4 NB_APP=2 E1_LB2=1 E2_OBS=1 
+destroy -f : 36 s
+up         : 1742 s (code de retour 0)
+TOTAL      : 1778 s (29 min 38 s)
+Machines en marche : 7
+/sante    → {"etat": "ok", "serveur": "app1"} [200]
+/resultat → {"matricule": "BF000123", "nom": "Eleve 000123", "serie": "C", "moyenne": 5.49, "admis": false, "serveur": "app2"} [200]
+Erreurs dans le journal Vagrant : 0
