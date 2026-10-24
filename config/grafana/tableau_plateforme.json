@@ -43,7 +43,9 @@
         {
           "refId": "A",
           "expr": "max by (server) (haproxy_server_status{proxy=\"serveurs_applicatifs\", state=\"UP\"})",
-          "legendFormat": "{{server}}"
+          "legendFormat": "{{server}}",
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -69,7 +71,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "h": 5, "w": 24, "x": 0, "y": 9 },
       "targets": [
-        { "refId": "A", "expr": "up{job=\"node\"}", "legendFormat": "{{machine}}" }
+        { "refId": "A", "expr": "up{job=\"node\"}", "legendFormat": "{{machine}}", "instant": true, "range": false }
       ],
       "fieldConfig": {
         "defaults": {
@@ -127,6 +129,25 @@
         ]
       },
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    },
+    {
+      "id": 6,
+      "type": "state-timeline",
+      "title": "Historique de disponibilité des machines (pannes V2, V4, V6…)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 23 },
+      "targets": [
+        { "refId": "A", "expr": "up{job=\"node\"}", "legendFormat": "{{machine}}" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] },
+          "mappings": [ { "type": "value", "options": { "0": { "text": "éteinte", "color": "red" }, "1": { "text": "OK", "color": "green" } } } ]
+        },
+        "overrides": []
+      },
+      "options": { "showValue": "never", "mergeValues": true, "rowHeight": 0.8, "legend": { "showLegend": false } }
     }
   ]
 }
