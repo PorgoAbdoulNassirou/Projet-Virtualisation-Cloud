@@ -6,12 +6,17 @@
 # - paquets de base groupés en un seul appel apt
 # - fuseau horaire (horodatage cohérent des mesures entre machines)
 # - bloc /etc/hosts engendré depuis config/plateforme.json
+# - node_exporter si l'extension E2 est active (THIOMBIANO, rotation)
 # Idempotent : rejoué deux fois, il ne modifie rien.
 # =============================================================================
 set -euo pipefail
 source /vagrant/scripts/lib.sh
 
-installer_paquets python3 curl ca-certificates
+E2=$(plateforme valeur extensions.e2_obs)
+
+paquets=(python3 curl ca-certificates)
+[ "$E2" = "1" ] && paquets+=(prometheus-node-exporter)
+installer_paquets "${paquets[@]}"
 
 if [ "$(timedatectl show -p Timezone --value)" != "Africa/Ouagadougou" ]; then
   timedatectl set-timezone Africa/Ouagadougou
@@ -32,10 +37,11 @@ if installer_si_change "$TMP" /etc/hosts 644; then
 fi
 
 # --- Extension E2 : node_exporter sur chaque machine -------------------------
-# À compléter par l'ingénieur observabilité (THIOMBIANO) : commit hors domaine.
-# if [ "${E2_OBS:-0}" = "1" ]; then
-#   installer_paquets prometheus-node-exporter
-#   systemctl enable --now prometheus-node-exporter
-# fi
+# Écoute sur le port 9100 de toutes les interfaces : obs le collecte par le
+# réseau privé (cibles engendrées par obs.sh depuis la même table).
+if [ "$E2" = "1" ]; then
+  systemctl enable --quiet prometheus-node-exporter
+  systemctl is-active --quiet prometheus-node-exporter || systemctl start prometheus-node-exporter
+fi
 
 journal "socle commun prêt"
