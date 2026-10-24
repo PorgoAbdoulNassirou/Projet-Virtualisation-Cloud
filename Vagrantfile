@@ -134,10 +134,11 @@ Vagrant.configure("2") do |config|
       m.vm.provision "commun", type: "shell", path: "scripts/commun.sh",
                      env: VARIABLES, run: "always"
 
-      # Rôle de la machine. Le répartiteur est rejoué à chaque « vagrant up » :
-      # c'est ce qui lui fait découvrir les nouveaux serveurs quand NB_APP change.
+      # Rôle de la machine. Le répartiteur et la supervision sont rejoués à chaque
+      # « vagrant up » : c'est ce qui leur fait découvrir les nouveaux serveurs
+      # quand NB_APP change (HAProxy et cibles Prometheus engendrées).
       m.vm.provision "role", type: "shell", path: "scripts/#{n['role']}.sh",
-                     env: VARIABLES, run: (n["role"] == "lb" ? "always" : "once")
+                     env: VARIABLES, run: (%w[lb obs].include?(n["role"]) ? "always" : "once")
 
       # Bases : après une bascule, l'ancien primaire qui redémarre est
       # reconverti en réplique du nouveau (§ 5.3). Sans effet en temps normal.
