@@ -150,14 +150,15 @@ service rétabli sur bdd2.
 `docs/dossier_architecture.md` (assemblage).
 
 **À faire :**
-- [ ] `v1_repartition.sh` (20 appels à `/info`, comptage par serveur, écart < 20 %) ;
-- [ ] `v3_montee_charge.sh` (`ab -n 2000 -c 50` avec N=2 puis N=4, req/s) ;
-- [ ] `v4_panne_bdd.sh` (avec OUEDRAOGO) et `v5_reconstruction.sh` (durée totale de `destroy` + `up`) ;
-- [ ] tous les résultats bruts dans `tests/resultats/` (versionnés) + caractéristiques du poste ;
-- [ ] E2 : `obs.sh` (Prometheus + Grafana), cibles **engendrées** depuis `plateforme.json`,
+- [x] `v1_repartition.sh` (20 appels à `/info`, comptage par serveur, écart < 20 %) ;
+- [x] `v3_montee_charge.sh` (`ab -n 2000 -c 50` avec N=2 puis N=4, req/s) ;
+- [x] `v4_panne_bdd.sh` (avec OUEDRAOGO) et `v5_reconstruction.sh` (durée totale de `destroy` + `up`) ;
+- [x] tous les résultats bruts dans `tests/resultats/` (versionnés) + caractéristiques du poste ;
+- [x] E2 : `obs.sh` (Prometheus + Grafana), cibles **engendrées** depuis `plateforme.json`,
       tableau de bord provisionné par fichiers (débit, serveurs UP/DOWN, CPU) ;
-- [ ] **rotation** : activer node_exporter dans `scripts/commun.sh` (bloc déjà préparé, commenté) ;
-- [ ] assembler le dossier (10 à 15 pages) et le journal de bord ; captures Grafana pendant V2 et V3.
+- [x] **rotation** : activer node_exporter dans `scripts/commun.sh` (bloc déjà préparé, commenté) ;
+- [x] rédiger § 1, § 3.5 et § 6 du dossier et le journal de bord ; captures Grafana pendant V2, V3 et V4 (`docs/captures/`) ;
+- [ ] assembler le dossier final (10 à 15 pages, conversion Word/PDF) après relecture du groupe.
 
 **Fini quand :** chaque scénario V1 à V6 a sa commande exacte, son résultat brut et un commentaire
 honnête dans le dossier, et le tableau de bord montre le débit monter et un serveur disparaître.
@@ -263,6 +264,6 @@ Règle : au moins **un `vagrant destroy -f && vagrant up` par jour sur un poste 
 - [x] R8 : seul lb1 a un `forwarded_port` dans le Vagrantfile
 
 **Scénarios** (commande + résultat brut + commentaire dans le dossier)
-- [ ] V1 répartition, [x] V2 panne app, [ ] V3 charge N=2/N=4, [ ] V4 panne bdd, [ ] V5 reconstruction, [x] V6 panne lb
+- [x] V1 répartition, [x] V2 panne app, [x] V3 charge N=2/N=4, [x] V4 panne bdd, [x] V5 reconstruction, [x] V6 panne lb
 
 **Soutenance** : chaque membre a lancé lui-même au moins une fois **chaque** scénario.

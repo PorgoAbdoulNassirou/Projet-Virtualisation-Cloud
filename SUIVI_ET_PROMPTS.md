@@ -26,6 +26,8 @@ Le détail des tâches et des contrats est dans [docs/PLAN_DE_TRAVAIL.md](docs/P
 | Service HTTP sans état (`/resultat`, `/sante`, `/info`), déploiement systemd, scénario V2 (0 requête perdue) | `app/app.py`, `scripts/app.sh`, `tests/v2_panne_app.sh` | KOBENDE Pêgdwendé Evrard | ✅ fusionné, testé en VM par PORGO |
 | Test d'intégration complet (R1 1 934 s, R2 6/6, R4 1,3 s, V6 1,70 s, bascule de base) et correctif `timeout check 3s` | `scripts/generer_config_lb.py`, `tests/resultats/` | PORGO Abdoul Nassirou | ✅ mesuré |
 | Remise en service de bdd1 après bascule (§ 5.3) : réintégration automatique en réplique, garde-fous `bdd.sh` / `replique.sh`, bascule symétrique | `scripts/reintegrer_bdd.sh`, `Vagrantfile`, `scripts/bdd.sh`, `scripts/replique.sh`, `scripts/bascule_bdd.sh` | PORGO Abdoul Nassirou (pour OUEDRAOGO) | ✅ testé : réplique en 39 s, R2 après bascule OK |
+| Extension E2 : Prometheus (cibles engendrées), Grafana (tableau de bord provisionné), node_exporter partout ; idempotence vérifiée | `scripts/obs.sh`, `config/grafana/`, `scripts/commun.sh`, `Vagrantfile` (rôle obs `run: always`) | THIOMBIANO Yempabou Romaric Johan | ✅ testé en VM, branche `feat/obs` + `feat/tests` |
+| Scénarios V1, V3, V4, V5 et mesures (V1 0 %, V2 0/139 et 0/132, V3 15,7 → 12,3 réponses 200/s, V4 bascule 3 s, V5 1 778 s), captures C1 à C6b | `tests/v1…v5_*.sh`, `tests/resultats/`, `docs/captures/` | THIOMBIANO Yempabou Romaric Johan | ✅ mesuré le 24/10, branche `feat/tests` |
 | Squelettes et contrats des autres rôles | `scripts/bdd.sh`, `replique.sh`, `bascule_bdd.sh`, `app.sh`, `obs.sh`, `app/README.md`, `tests/README.md` | PORGO Abdoul Nassirou | ✅ squelettes, **à remplir** |
 
 > ✅ **Jalon J1 atteint le 23/10** : `vagrant up` complet réussi sur le poste de PORGO (box `bento/ubuntu-24.04`
@@ -40,7 +42,7 @@ Le détail des tâches et des contrats est dans [docs/PLAN_DE_TRAVAIL.md](docs/P
 | **PORGO Abdoul Nassirou** | Architecte réseau et répartition | Inviter les membres comme collaborateurs ; relire et fusionner la branche de THIOMBIANO ; répétition de la démo |
 | **OUEDRAOGO Armand Hendrix** | Ingénieur données | ✅ partie fusionnée. Reste : **relire les sections 3.3 et 5.2 du dossier** (rédigées par PORGO à partir de ses scripts) ; **rotation** (commit hors domaine, voir § 5.1) |
 | **KOBENDE Pêgdwendé Evrard** | Ingénieur applicatif | ✅ partie fusionnée et testée. Reste : savoir expliquer l'ensemble en soutenance ; bonus E4 seulement si tout le reste est fini |
-| **THIOMBIANO Yempabou Romaric Johan** | Ingénieur essais et observabilité | **C'est son tour** : E2 (`obs.sh`, Grafana), V1, V3, V4, V5, section 1 et 3.5 du dossier, assemblage du rapport et du journal ; rotation node_exporter dans `commun.sh` |
+| **THIOMBIANO Yempabou Romaric Johan** | Ingénieur essais et observabilité | ✅ le 24/10 : E2 (`obs.sh`, Grafana), V1, V3, V4, V5 mesurés, § 1, 3.5 et 6 du dossier, journal ; rotation node_exporter. Reste : **fusion des branches `feat/obs` et `feat/tests`**, assemblage final du rapport après relecture |
 
 ---
 
@@ -223,10 +225,11 @@ puisse la défendre en soutenance.
 - [x] **2** KOBENDE : `app.py` + `app.sh` fusionnés (V2 mesuré : 0 perdue / 81) — 23/10
 - [x] **2** OUEDRAOGO : `bascule_bdd.sh` fusionné (bascule mesurée : 2 s) — 23/10
 - [x] **2** PORGO : R2, R3, R4, R8 vérifiés ; V6 rejoué avec l'application finale (1,70 s)
-- [ ] **1** THIOMBIANO : E2 fusionnée
-- [ ] **3** THIOMBIANO : V1, V3, V4, V5 mesurés ; dossier assemblé
+- [ ] **1** THIOMBIANO : E2 fusionnée (faite et poussée sur `feat/obs` le 24/10, pull request à fusionner)
+- [x] **3** THIOMBIANO : V1, V3, V4, V5 mesurés le 24/10 (branche `feat/tests`) ; § 1, 3.5 et 6 du dossier rédigés
+- [ ] **3** THIOMBIANO : dossier final assemblé et converti (après relecture du groupe)
 - [ ] **4** TOUS : `destroy` + `up` sur un poste vierge ; démo répétée ; chacun a lancé chaque scénario
-- [ ] **Rotation** : [x] KOBENDE (v2), [ ] OUEDRAOGO (§ 5.1), [ ] THIOMBIANO (commun.sh), [x] PORGO (v6)
+- [ ] **Rotation** : [x] KOBENDE (v2), [ ] OUEDRAOGO (§ 5.1), [x] THIOMBIANO (commun.sh), [x] PORGO (v6)
 
 ---
 
