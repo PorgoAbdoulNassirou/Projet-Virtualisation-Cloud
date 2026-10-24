@@ -339,7 +339,7 @@ R2 à R8 l'ont été le 23/10 sur le poste de PORGO (même modèle de processeur
 | V3 charge N=2 / N=4 | req/s | **Débit utile (réponses 200/s) : 15,7 avec N = 2, 12,3 avec N = 4** ; ab annonce 26,5 et 26,2 req/s, mais 41 % puis 53 % des réponses sont des 503 : la base est le goulot | `v3_N2_20261024_151124.log`, `v3_N4_20261024_160100.log` |
 | V4 panne bdd1 | durée de la bascule | **503 JSON propre pendant la panne, 0 réponse brute sur 160 sondes ; promotion 3 s ; service rétabli 3 à 5 s après la bascule** ; bdd1 redevenue réplique en 25 s | `v4_20261024_161821.log`, `v4_20261024_161821_sonde.log` |
 | V5 reconstruction | durée totale | **1 778 s (29 min 38 s)** pour les 7 machines, E1 et E2 comprises ; aucune commande ensuite, 0 erreur, `/sante` et `/resultat` en 200 | `v5_20261024_164401.log`, `v5_20261024_164401_vagrant.log` |
-| V6 panne lb1 | temps de reprise VRRP | **Application finale : 1 requête perdue sur 124, interruption réelle 1,70 s.** Application de test : 1/122 en 1,73 s, 1/130 en 1,68 s | `v6_20261023_163244.log`, `v6_20261023_104601.log`, `v6_20261023_104251.log` |
+| V6 panne lb1 | temps de reprise VRRP | **Application finale : 1 requête perdue sur 124, interruption réelle 1,70 s** ; rejoué sur le poste de THIOMBIANO : 1/114 en 1,74 s. Application de test : 1/122 en 1,73 s, 1/130 en 1,68 s | `v6_20261023_163244.log`, `v6_20261024_182157.log`, `v6_20261023_104601.log`, `v6_20261023_104251.log` |
 
 ### 6.1 V1 : répartition (THIOMBIANO)
 
