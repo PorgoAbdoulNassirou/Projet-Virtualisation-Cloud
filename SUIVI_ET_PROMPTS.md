@@ -242,4 +242,9 @@ puisse la défendre en soutenance.
 | L3 | Journal de bord | **1 à 2 pages** : rôles, décisions et pourquoi, difficultés et solutions | tous | `docs/journal_de_bord.md` |
 | L4 | Démonstration | **20 min** sur machine vierge : destruction, reconstruction, 3 scénarios tirés au sort | tous | — |
 
-Conversion du rapport pour le rendu : `pandoc docs/dossier_architecture.md -o dossier_architecture.docx`
+Conversion pour le rendu, depuis la racine du dépôt (modèle compact `docs/modele_word.docx` : dossier en 14 pages, journal en 2 pages) :
+
+```bash
+pandoc docs/dossier_architecture.md --resource-path=docs --reference-doc docs/modele_word.docx -o docs/dossier_architecture.docx
+pandoc docs/journal_de_bord.md --reference-doc docs/modele_word.docx -o docs/journal_de_bord.docx
+```

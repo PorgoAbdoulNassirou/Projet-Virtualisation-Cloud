@@ -1,7 +1,8 @@
 # Dossier d'architecture : RÉSULTATS-BF
 
 > Livrable L2, 10 à 15 pages. Assemblage : THIOMBIANO. Chaque section indique son rédacteur.
-> Convertir en PDF pour le rendu (`pandoc dossier_architecture.md -o dossier_architecture.pdf`).
+> Conversion pour le rendu, depuis la racine du dépôt (14 pages, modèle de mise en page `docs/modele_word.docx`) :
+> `pandoc docs/dossier_architecture.md --resource-path=docs --reference-doc docs/modele_word.docx -o docs/dossier_architecture.docx`
 
 **Groupe 04 (réseau 192.168.59.0/24) — Membres :** KOBENDE Pêgdwendé Evrard, PORGO Abdoul Nassirou,
 OUEDRAOGO Armand Hendrix, THIOMBIANO Yempabou Romaric Johan
@@ -373,6 +374,8 @@ virtuelle, `vagrant halt app1` à t = 5 s).
 l'écarte et `retry-on` + `redispatch` rejouent sur app2 les requêtes déjà parties vers elle. Capture
 **C3** : app1 DOWN et ÉTEINTE, la courbe d'app2 prend tout le débit, aucune réponse 5xx.
 
+![C3 : V2 vu par Grafana. app1 est écartée (DOWN, ÉTEINTE), app2 reprend tout le débit, uniquement des réponses 2xx.](captures/C3_grafana_panne_app1.png){width=100%}
+
 ### 6.3 V3 : montée en charge, N = 2 puis N = 4 (THIOMBIANO)
 
 **Commande** : `bash tests/v3_montee_charge.sh`, qui exécute 3 tirs de
@@ -406,6 +409,8 @@ c'est le résultat, et il s'explique :
    2 par les arrêts volontaires de V2, app2 6 fois).
 5. **Avec N = 4, c'est pire** : deux fois plus de serveurs ouvrent des connexions concurrentes vers la même
    base saturée, et 9 machines virtuelles se partagent les 4 cœurs du même ordinateur.
+
+![C5 : V3 avec N = 4. Les trois tirs, quatre serveurs à débit égal, bdd1 à 100 % de CPU (courbe rouge) et les réponses 5xx (rouge) qui accompagnent chaque tir.](captures/C5_grafana_charge_N4.png){width=100%}
 
 **Ce que la plateforme fait bien malgré tout** : aucune requête sans réponse (`Failed requests: 0` sur
 12 000), aucune page d'erreur brute ; elle **dégrade proprement** au lieu de s'effondrer.
@@ -442,6 +447,8 @@ promouvoir bdd2 tant que l'ancien primaire répond. La procédure elle-même co�
 à une vingtaine de secondes **plus le temps de réaction d'un humain** : c'est une estimation, pas une
 mesure. Pour la supprimer, il faut une bascule automatique (§ 7). Captures **C6** (terminal) et **C6b**
 (Grafana : bloc rouge de bdd1 dans l'historique, réponses 5xx pendant la panne).
+
+![C6b : historique de disponibilité. Le bloc rouge de bdd1 (vers 16:19-16:22) est la panne V4 ; app3 et app4 disparaissent au retour à N = 2.](captures/C6b_grafana_panne_bdd1.png){width=100%}
 
 ### 6.5 V5 : reconstruction intégrale (THIOMBIANO)
 
