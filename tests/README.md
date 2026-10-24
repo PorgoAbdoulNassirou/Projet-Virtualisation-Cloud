@@ -8,11 +8,11 @@ car ce sont les preuves des chiffres du dossier. Une mesure qui ne figure pas ic
 
 | Script | Scénario | Responsable | État |
 |---|---|---|---|
-| `v1_repartition.sh` | 20 appels à `/info`, écart entre serveurs < 20 % | THIOMBIANO | à écrire |
-| `v2_panne_app.sh` | `vagrant halt app1` pendant une charge | KOBENDE (rotation) | **mesuré** : 0 perdue / 81 |
-| `v3_montee_charge.sh` | `ab -n 2000 -c 50` avec N=2 puis N=4 | THIOMBIANO | à écrire |
-| `v4_panne_bdd.sh` | `vagrant halt bdd1`, `/sante` → 503, bascule chronométrée, puis `vagrant up bdd1` | THIOMBIANO | à écrire (test d'intégration déjà fait : `integration_bascule_*.log`) |
-| `v5_reconstruction.sh` | `vagrant destroy -f` puis `vagrant up`, durée totale | THIOMBIANO | à écrire |
+| `v1_repartition.sh` | 20 appels à `/info`, écart entre serveurs < 20 % | THIOMBIANO | **mesuré** : 10/10 et 5/5/5/5, écart 0 % |
+| `v2_panne_app.sh` | `vagrant halt app1` pendant une charge | KOBENDE (rotation) | **mesuré** : 0 perdue / 81, / 139, / 132 |
+| `v3_montee_charge.sh` | `ab -n 2000 -c 50` avec N=2 puis N=4, 3 tirs, débit utile | THIOMBIANO | **mesuré** : 15,7 puis 12,3 réponses 200/s (base saturée) |
+| `v4_panne_bdd.sh` | `vagrant halt bdd1`, `/sante` → 503, bascule chronométrée, puis `vagrant up bdd1` | THIOMBIANO | **mesuré** : 503 JSON, bascule 3 s, retour 3 à 5 s après |
+| `v5_reconstruction.sh` | `vagrant destroy -f` puis `vagrant up`, durée totale | THIOMBIANO | **mesuré** : 1 778 s (29 min 38 s), 7 machines, 0 erreur |
 | `v6_panne_lb.sh` | `vagrant halt lb1`, service joignable sur l'IP virtuelle | PORGO (rotation) | **mesuré** : 1/122 perdue, 1,73 s |
 | `verifier_repartition.sh` | R2 (idempotence), R3 (NB_APP), R4 (éviction < 5 s), R8 (ports) | PORGO | **mesuré** |
 

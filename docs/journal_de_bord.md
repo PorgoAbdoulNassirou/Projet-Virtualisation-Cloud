@@ -24,7 +24,11 @@
 | 23/10 | KOBENDE | `target_session_attrs=read-write` sur `host=bdd1,bdd2` | L'application suit la bascule de la base sans modification ni redémarrage |
 | 23/10 | KOBENDE | Service systemd sous un utilisateur système dédié, `app.env` en mode 600 | Le service ne tourne jamais en root ; le mot de passe n'est lisible que par root |
 | 23/10 | KOBENDE | `connect_timeout=2` et `statement_timeout=2000` | `/sante` répond toujours avant le délai de la sonde HAProxy, même base morte |
-| | | | |
+| 24/10 | THIOMBIANO | Cibles Prometheus engendrées depuis `plateforme.json`, et rôle obs rejoué à chaque `vagrant up` comme le répartiteur | R3 : avec `NB_APP=4`, app3 et app4 apparaissent seules dans la supervision (mesuré : 7 → 9 → 7 machines) |
+| 24/10 | THIOMBIANO | Tableau de bord Grafana provisionné par fichiers (`config/grafana/`) | R1 : il survit à `vagrant destroy`, c'est du code versionné, pas des clics |
+| 24/10 | THIOMBIANO | node_exporter ajouté à l'appel apt unique de `commun.sh` (rotation) | Règle « un seul appel apt par script » ; lu dans `plateforme.json` comme dans `lb.sh` |
+| 24/10 | THIOMBIANO | V3 : 3 tirs par valeur de N, médiane, et calcul du **débit utile** (réponses 200/s) | Un seul tir est trop bruité sur un poste partagé ; `ab` compte les 503 dans ses req/s, ce qui gonflait le chiffre |
+| 24/10 | THIOMBIANO | Ne pas modifier l'application (pool de connexions) à deux jours du rendu | Décision qui revient à KOBENDE et PORGO ; il aurait fallu refaire V2, V4, R4 et V6. Goulot documenté au § 6.3 et au § 7 |
 
 ## Difficultés rencontrées et solutions
 
@@ -39,4 +43,6 @@
 | 23/10 | PORGO | Test d'intégration de la bascule (base + application + répartiteur, première fois ensemble) : après `bascule_bdd.sh` réussie (3 s), le service restait en **503**. HAProxy marquait app1/app2 `L7TOUT` : `/sante` mettait 0,6 à 2,1 s (libpq essaie bdd1 éteinte avant bdd2), au-delà de `timeout check 1s` | `timeout check` porté à 3 s (la connexion de la sonde reste bornée à 1 s, R4 inchangée sur panne franche) ; 503 de HAProxy renvoyé en JSON. Service rétabli dès le rechargement. Compromis documenté au § 3.1 du dossier |
 | 23/10 | PORGO | Remise en service de bdd1 après bascule : PostgreSQL y redémarre **en primaire** (deux primaires, applications sur l'ancienne base) ; et `vagrant provision bdd2` après bascule **effaçait** bdd2 promue | `reintegrer_bdd.sh` (rejoué à chaque `vagrant up`) compare les lignes de temps et reconvertit l'ancien primaire en réplique (39 s) ; garde-fous dans `bdd.sh` et `replique.sh` ; bascule symétrique. Fenêtre résiduelle de 42,7 s mesurée et documentée (§ 5.3) |
 | 23/10 | KOBENDE | Poste de développement Mac M2 (processeur ARM) : la box `bento/ubuntu-24.04` amd64 ne tourne pas sous VirtualBox, impossible de faire `vagrant up` localement | `app.py` testé sur l'hôte sans base (codes 200, 400, 404, 503 vérifiés) ; tests en VM (provision ×2, `/info`, `/sante`, V2) confiés au poste Windows de PORGO lors de la relecture de la PR |
-| | | | |
+| 24/10 | THIOMBIANO | Premier déploiement de obs : Grafana 13 met **10 min** à démarrer, le provisionnement échoue (port 3000 injoignable après 120 s) ; le noyau tue des services système | Journal de Grafana : une douzaine de plugins de sources de données chargés, chacun un processus, sur 768 Mo. `GF_PLUGINS_DISABLE_PLUGINS` (on ne garde que Prometheus) et `GF_PLUGINS_PREINSTALL_DISABLED` : provisionnement en 1 min 08 s, puis « inchangé » au rejeu |
+| 24/10 | THIOMBIANO | Grafana : les machines détruites (app3, app4) restaient affichées « DOWN » après le retour à N=2, ce qui faisait croire à une panne | Panneaux d'état en requête instantanée (seules les machines existantes) et ajout d'une frise d'historique de disponibilité, qui montre au contraire les vraies pannes (V2, V4) |
+| 24/10 | THIOMBIANO | V3 : 41 % (N=2) puis 53 % (N=4) de 503 sous `ab -c 50`, et le débit utile baisse quand N double | Diagnostic : bdd1 (1 vCPU) à 100 %, une connexion SCRAM par requête, attentes > `connect_timeout` ; aucune erreur côté PostgreSQL. Résultat conservé et expliqué (§ 6.3), amélioration proposée (PgBouncer) |
