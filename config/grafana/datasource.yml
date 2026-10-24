@@ -1,0 +1,14 @@
+# Source de données Grafana, provisionnée par scripts/obs.sh (extension E2).
+# Prometheus tourne sur la même machine (obs) : localhost n'est pas une adresse de la plateforme.
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://localhost:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      # Même intervalle que la collecte : $__rate_interval vaut alors 20 s.
+      timeInterval: 5s
