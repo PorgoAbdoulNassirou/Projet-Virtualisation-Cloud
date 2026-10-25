@@ -14,6 +14,7 @@ car ce sont les preuves des chiffres du dossier. Une mesure qui ne figure pas ic
 | `v4_panne_bdd.sh` | `vagrant halt bdd1`, `/sante` → 503, bascule chronométrée, puis `vagrant up bdd1` | THIOMBIANO | **mesuré** : 503 JSON, bascule 3 s, retour 3 à 5 s après |
 | `v5_reconstruction.sh` | `vagrant destroy -f` puis `vagrant up`, durée totale | THIOMBIANO | **mesuré** : 1 778 s (29 min 38 s), 7 machines, 0 erreur |
 | `v6_panne_lb.sh` | `vagrant halt lb1`, service joignable sur l'IP virtuelle | PORGO (rotation) | **mesuré** : 1/122 perdue, 1,73 s |
+| `verifier_replication.sh` | R5 : écriture sur bdd1 lue sur bdd2, puis ligne de test supprimée | OUEDRAOGO (rotation) | **mesuré** : ≤ 1 s |
 | `verifier_repartition.sh` | R2 (idempotence), R3 (NB_APP), R4 (éviction < 5 s), R8 (ports) | PORGO | **mesuré** |
 
 ## Adresse à interroger

@@ -10,7 +10,8 @@ Le détail de chaque point est dans le dossier d'architecture (§ indiqué).
 **Rôles.** PORGO Abdoul Nassirou : architecte réseau et répartition (E1). KOBENDE Pêgdwendé Evrard :
 ingénieur applicatif. OUEDRAOGO Armand Hendrix : ingénieur données. THIOMBIANO Yempabou Romaric Johan :
 ingénieur essais et observabilité (E2). Commits hors de son domaine (rotation) : V2 par KOBENDE, V6 et
-remise en service de la base par PORGO, node_exporter dans `commun.sh` par THIOMBIANO.
+remise en service de la base par PORGO, node_exporter dans `commun.sh` par THIOMBIANO, vérification R5
+par OUEDRAOGO.
 
 ## Décisions prises et pourquoi
 

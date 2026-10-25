@@ -40,7 +40,7 @@ Le détail des tâches et des contrats est dans [docs/PLAN_DE_TRAVAIL.md](docs/P
 | Membre | Rôle | Reste à faire |
 |---|---|---|
 | **PORGO Abdoul Nassirou** | Architecte réseau et répartition | ✅ branches de THIOMBIANO fusionnées, rapport et journal mis en forme pour le rendu (PDF), fiche de démonstration. Reste : **envoyer** (§ 7) et répéter la démo |
-| **OUEDRAOGO Armand Hendrix** | Ingénieur données | ✅ partie fusionnée. **URGENT avant l'envoi : commit hors de son domaine** (rotation obligatoire, l'historique Git fait foi) : voir le prompt § 5.1 |
+| **OUEDRAOGO Armand Hendrix** | Ingénieur données | ✅ partie fusionnée ; ✅ rotation faite le 25/10 (`tests/verifier_replication.sh`, R5 vérifiée sur deux postes) |
 | **KOBENDE Pêgdwendé Evrard** | Ingénieur applicatif | ✅ partie fusionnée et testée. Reste : préparer la soutenance (`docs/DEMONSTRATION.md`) |
 | **THIOMBIANO Yempabou Romaric Johan** | Ingénieur essais et observabilité | ✅ E2, V1, V3, V4, V5, rapport assemblé ; branches fusionnées dans `main` le 25/10 |
 
@@ -121,7 +121,7 @@ ou d'une IA dans les commits ou les pull requests. Explique-moi chaque décision
 la défendre en soutenance.
 ```
 
-### 5.1 OUEDRAOGO Armand Hendrix (URGENT : commit de rotation avant l'envoi)
+### 5.1 OUEDRAOGO Armand Hendrix (✅ rotation faite le 25/10 ; prompt conservé pour mémoire)
 
 ```text
 Tu travailles sur le dépôt RÉSULTATS-BF (projet Vagrant + VirtualBox, groupe 04, réseau
@@ -235,7 +235,7 @@ puisse la défendre en soutenance.
 - [x] **3** THIOMBIANO : V1, V3, V4, V5 mesurés le 24/10 (branche `feat/tests`) ; § 1, 3.5 et 6 du dossier rédigés
 - [x] **3** THIOMBIANO / PORGO : dossier final assemblé, en-tête de rendu, converti en Word et PDF (15 pages) le 25/10
 - [ ] **4** TOUS : `destroy` + `up` sur un poste vierge ; démo répétée ; chacun a lancé chaque scénario
-- [ ] **Rotation** : [x] KOBENDE (v2), [ ] OUEDRAOGO (§ 5.1), [x] THIOMBIANO (commun.sh), [x] PORGO (v6)
+- [x] **Rotation** : [x] KOBENDE (v2), [x] OUEDRAOGO (verifier_replication.sh), [x] THIOMBIANO (commun.sh), [x] PORGO (v6)
 
 ---
 
@@ -268,5 +268,5 @@ Message type : « Groupe 04 (KOBENDE, PORGO, OUEDRAOGO, THIOMBIANO), projet RÉS
 Ci-joints le dossier d'architecture et le journal de bord. Le README du dépôt suffit pour reconstruire la
 plateforme (`vagrant up`). »
 
-**Avant d'envoyer** : (1) commit de rotation d'OUEDRAOGO fusionné ; (2) vérifier que le dépôt est
+**Avant d'envoyer** : (1) ✅ commit de rotation d'OUEDRAOGO fusionné ; (2) vérifier que le dépôt est
 accessible à l'enseignant ; (3) ne jamais joindre le fichier `.env`.

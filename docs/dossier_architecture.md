@@ -489,6 +489,7 @@ l'expiration des annonces (3 × `advert_int` + décalage ≈ 3 à 4 s), ce qui r
 | R2 | `vagrant provision` ×2 sur les 6 VM, empreintes SHA-256 des fichiers de configuration (socle, HAProxy, keepalived, application, PostgreSQL) **et PID des services** | **6/6 identiques** sur la plateforme complète | `repartition_20261023_162550.log` (socle seul : `repartition_20261023_105608.log`) |
 | R3 | `NB_APP=4` puis stats HAProxy et 20 appels à `/info` | 4 serveurs UP, **5/5/5/5** ; retour à 2 exécuté | `repartition_20261023_110244.log` |
 | R4 | arrêt du service de app1, scrutation des stats toutes les 200 ms | application finale : **1 394 ms**, puis **1 279 ms** après le passage à `timeout check 3s` (application de test : 1 037 ms) ; exigence < 5 000 ms | `repartition_20261023_162950.log`, `repartition_20261023_165028.log`, `repartition_20261023_104215.log` |
+| R5 | `bash tests/verifier_replication.sh` (OUEDRAOGO) : insertion d'une ligne datée sur bdd1, lecture sur bdd2, suppression | ligne lue sur bdd2 **dès la 1re lecture (≤ 1 s)**, sur le poste d'OUEDRAOGO puis sur celui de PORGO ; ligne de test supprimée | `r5_replication_20261025.log`, `r5_replication_20261025_141141_poste_porgo.log` |
 | R8 | `vagrant port` sur chaque VM | seul lb1 : 80 → 8080 ; ailleurs SSH Vagrant uniquement | `repartition_20261023_104842.log` |
 | V1 (préliminaire) | 20 appels à `/info` sur l'IP virtuelle, N = 2 | **10/10**, écart 0 %, avec l'application de test puis avec l'application finale (alternance stricte app1/app2) | — (mesure officielle : THIOMBIANO, `v1_repartition.sh`) |
 

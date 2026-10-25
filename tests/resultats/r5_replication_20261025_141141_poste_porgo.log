@@ -1,0 +1,7 @@
+Commande hôte : bash tests/verifier_replication.sh (poste de PORGO, 25/10/2026 14:11:42)
+Commande bdd1 : INSERT d'une ligne temporaire (R5TEST179293752016297)
+INSERT 0 1
+Commande bdd2 : SELECT de la ligne (R5TEST179293752016297)
+Résultat : R5TEST179293752016297|Test R5|A|12.50|t
+R5 VALIDÉ : écriture primaire visible sur la réplique après 1 s.
+code de sortie : 0
