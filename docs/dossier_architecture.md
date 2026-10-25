@@ -1,549 +1,554 @@
 ---
 title: "RÉSULTATS-BF"
-subtitle: "Dossier d'architecture : une infrastructure résiliente et scalable, entièrement décrite en code avec Vagrant"
+subtitle: "Dossier d'architecture d'une infrastructure résiliente et scalable, décrite en code avec Vagrant"
 author:
   - "Groupe 04 : KOBENDE Pêgdwendé Evrard, PORGO Abdoul Nassirou, OUEDRAOGO Armand Hendrix, THIOMBIANO Yempabou Romaric Johan"
-date: "Université Joseph Ki-Zerbo, IBAM · M1 Informatique · Virtualisation et Cloud Computing · Enseignant : Dr SOMDA · 26 octobre 2026"
+date: "Université Joseph Ki-Zerbo, IBAM, M1 Informatique. Virtualisation et Cloud Computing, Dr SOMDA. 26 octobre 2026"
 ---
 
-Dépôt : <https://github.com/PorgoAbdoulNassirou/Projet-Virtualisation-Cloud>. Réseau du groupe :
-`192.168.59.0/24`. Chaque section indique son rédacteur ; chaque chiffre renvoie à un fichier brut de
-`tests/resultats/`.
-
----
+Le code est disponible sur <https://github.com/PorgoAbdoulNassirou/Projet-Virtualisation-Cloud>. Notre
+groupe travaille sur le réseau `192.168.59.0/24`. Chaque section indique qui l'a rédigée, et chaque chiffre
+cité renvoie à un fichier de résultats conservé dans `tests/resultats/`.
 
 ## 1. Contexte et exigences (THIOMBIANO)
 
-Chaque année, la publication des résultats d'examens provoque le même incident : le site tombe dans les
-minutes qui suivent l'annonce. Le programme n'est presque jamais en cause. C'est l'infrastructure, qui
-n'a été pensée ni pour absorber un pic de consultations, ni pour survivre à la panne d'une seule machine.
+Chaque année, au moment de la publication des résultats d'examens, le site tombe quelques minutes après
+l'annonce. Le programme n'y est presque jamais pour rien : c'est l'infrastructure qui n'a pas été prévue
+pour encaisser un pic de consultations, ni pour continuer à fonctionner quand une machine lâche.
 RÉSULTATS-BF permet à un candidat de consulter son résultat à partir de son matricule. L'application
-(trois points d'entrée, moins de 100 lignes) est volontairement minuscule : ce qui est évalué, c'est
-l'infrastructure autour d'elle et la preuve, chiffrée, qu'elle tient.
+elle-même est volontairement très simple (trois points d'entrée, moins de cent lignes). Ce qui compte
+dans ce projet, c'est l'infrastructure qui l'entoure et notre capacité à montrer, mesures à l'appui,
+qu'elle tient.
 
-Deux exigences non fonctionnelles priment, et chacune se traduit en choix d'architecture concrets :
+Deux exigences non fonctionnelles guident tous nos choix :
 
-| Exigence | Ce qu'elle impose | Choix retenus |
+| Exigence | Ce qu'elle impose | Ce que nous avons mis en place |
 |---|---|---|
-| **Résilience** : la panne d'une machine n'interrompt pas le service | Aucun point de défaillance unique sur le chemin d'une requête | N ≥ 2 serveurs applicatifs **sans état** derrière HAProxy, qui ne leur envoie du trafic que s'ils répondent sur `/sante` (R4) ; répartiteur doublé avec une IP virtuelle VRRP (E1) ; base répliquée en flux, avec une bascule écrite et chronométrée (R5, R6) |
-| **Scalabilité** : absorber plus de trafic en ajoutant des machines, sans réécrire la configuration | Le nombre de serveurs est **un paramètre** ; tout ce qui en dépend est **engendré** | `NB_APP` dans `.env` ; la table `NOEUDS` du `Vagrantfile` est la source unique de vérité dont sont engendrés HAProxy, keepalived, `/etc/hosts` et les cibles Prometheus (R3) |
+| Résilience : la panne d'une machine ne doit pas interrompre le service | Aucun point de défaillance unique sur le chemin d'une requête | Au moins deux serveurs applicatifs sans état derrière HAProxy, qui ne leur envoie du trafic que s'ils répondent sur `/sante` (R4). Deux répartiteurs qui se partagent une IP virtuelle par VRRP (E1). Une base répliquée en flux, avec une procédure de bascule écrite et chronométrée (R5, R6) |
+| Scalabilité : absorber plus de trafic en ajoutant des machines, sans réécrire la configuration | Le nombre de serveurs doit être un simple paramètre, et tout ce qui en dépend doit être généré | La variable `NB_APP` dans `.env`. La table `NOEUDS` du `Vagrantfile` sert de source unique : HAProxy, keepalived, `/etc/hosts` et les cibles Prometheus en sont tous déduits (R3) |
 
-S'y ajoutent les exigences de qualité : la plateforme se reconstruit **sans aucun geste manuel**
-(`vagrant destroy -f && vagrant up`, R1), le provisionnement est **idempotent** (R2), aucun secret
-n'est versionné (R7), et seul le répartiteur expose un port vers l'hôte (R8). Enfin, **on mesure plutôt
-qu'on affirme** : chaque chiffre de ce dossier renvoie à un fichier brut de `tests/resultats/`,
-produit par un script de `tests/` que chacun peut rejouer.
+À cela s'ajoutent des exigences de qualité. La plateforme doit se reconstruire sans aucune intervention
+manuelle (`vagrant destroy -f && vagrant up`, R1). Le provisionnement doit pouvoir être rejoué sans rien
+changer (R2). Aucun mot de passe ne doit apparaître dans le dépôt (R7), et seul le répartiteur expose un
+port vers la machine hôte (R8). Enfin, nous avons voulu mesurer plutôt qu'affirmer : chaque résultat de ce
+dossier a été produit par un script du dossier `tests/`, que n'importe qui peut relancer.
 
 ## 2. Architecture (PORGO)
 
 ### 2.1 Vue d'ensemble
 
-Le client (navigateur, `curl`, `ab`) s'adresse à une **IP virtuelle** `192.168.59.5` portée par l'un
-des deux répartiteurs HAProxy (lb1 actif, lb2 passif), qui se la transmettent par VRRP (keepalived).
-Le répartiteur distribue les requêtes, en tourniquet, aux N serveurs applicatifs sans état ; ceux-ci lisent
-la base PostgreSQL primaire bdd1, répliquée en flux vers bdd2. La machine obs collecte les métriques
-(extension E2). Le schéma est celui du README.
+Le client (navigateur, `curl` ou `ab`) s'adresse à une IP virtuelle, `192.168.59.5`, portée par l'un des
+deux répartiteurs HAProxy : lb1 en temps normal, lb2 si lb1 tombe. Les deux machines se transmettent cette
+adresse grâce au protocole VRRP, géré par keepalived. Le répartiteur distribue les requêtes à tour de rôle
+entre les serveurs applicatifs, qui lisent la base PostgreSQL primaire bdd1. Celle-ci est répliquée en
+continu vers bdd2. Enfin, la machine obs collecte les métriques de toutes les autres (extension E2). Le
+schéma complet figure dans le README du dépôt.
 
-| Machine | IP | RAM | Rôle | Statut |
+| Machine | Adresse IP | RAM | Rôle | Statut |
 |---|---|---|---|---|
-| (IP virtuelle) | 192.168.59.5 | – | Adresse du service, portée par lb1 ou lb2 | E1 |
-| lb1 | 192.168.59.11 | 512 Mo | HAProxy 2.8 + keepalived, actif (priorité 150) | obligatoire |
-| lb2 | 192.168.59.12 | 512 Mo | HAProxy 2.8 + keepalived, passif (priorité 100) | E1 |
-| app1 … appN | 192.168.59.21 … .2N | 512 Mo | Service HTTP sans état, port 3000 | obligatoire |
+| IP virtuelle | 192.168.59.5 | sans objet | Adresse du service, portée par lb1 ou lb2 | E1 |
+| lb1 | 192.168.59.11 | 512 Mo | HAProxy 2.8 et keepalived, actif (priorité 150) | obligatoire |
+| lb2 | 192.168.59.12 | 512 Mo | HAProxy 2.8 et keepalived, en attente (priorité 100) | E1 |
+| app1 à appN | 192.168.59.21 à .2N | 512 Mo | Service HTTP sans état, port 3000 | obligatoire |
 | bdd1 | 192.168.59.31 | 768 Mo | PostgreSQL primaire | obligatoire |
 | bdd2 | 192.168.59.32 | 768 Mo | Réplique en flux, promouvable | obligatoire |
-| obs | 192.168.59.41 | 768 Mo | Prometheus + Grafana | E2 |
+| obs | 192.168.59.41 | 768 Mo | Prometheus et Grafana | E2 |
 
-Socle obligatoire : 5 VM, 3 072 Mo. Avec E1 et E2 : 4 352 Mo.
+Le socle obligatoire représente 5 machines et 3 072 Mo de mémoire. Avec les deux extensions, on arrive à
+7 machines et 4 352 Mo.
 
 ### 2.2 Plan d'adressage
 
-Depuis VirtualBox 6.1.28, les réseaux hôte-seul ne sont autorisés par défaut que dans
-`192.168.56.0/21`. Le groupe 04 utilise donc `192.168.(55+4).0/24 = 192.168.59.0/24`, sans toucher
-à `/etc/vbox/networks.conf` (ce qui rendrait le dépôt non reproductible). Les dizaines codent le rôle :
-`.1x` répartition, `.2x` applications, `.3x` données, `.4x` supervision, `.5` IP virtuelle.
-`NB_APP` est donc borné à 9 (`.21` à `.29`) pour ne jamais empiéter sur les bases.
+Depuis la version 6.1.28, VirtualBox n'accepte par défaut les réseaux privés hôte que dans la plage
+`192.168.56.0/21`. Notre groupe utilise donc `192.168.59.0/24` (55 + 4), sans toucher au fichier
+`/etc/vbox/networks.conf`, ce qui aurait rendu le dépôt dépendant de la configuration de chaque poste.
+Le dernier octet indique le rôle de la machine : `.1x` pour la répartition, `.2x` pour les applications,
+`.3x` pour les données et `.4x` pour la supervision, l'adresse `.5` étant réservée à l'IP virtuelle. Pour
+cette raison, `NB_APP` est limité à 9 serveurs (de `.21` à `.29`), afin de ne jamais empiéter sur les bases.
 
-### 2.3 Source unique de vérité (R3)
+### 2.3 Une seule source de vérité (R3)
 
-La table `NOEUDS` du `Vagrantfile` est la **seule** description de l'infrastructure. À chaque commande
-`vagrant`, elle est sérialisée dans `config/plateforme.json` (et `config/noeuds.yml`), que les VM lisent
-dans `/vagrant/config/` via `scripts/plateforme.py`. En découlent automatiquement :
-la configuration HAProxy (liste des serveurs), keepalived (pairs VRRP, interface, IP virtuelle),
-`/etc/hosts` de chaque machine et les cibles Prometheus. **Aucune adresse n'est écrite en dur** dans
-un script ou une configuration.
+La table `NOEUDS` du `Vagrantfile` est la seule description de l'infrastructure. À chaque commande
+`vagrant`, elle est écrite dans `config/plateforme.json` (et dans `config/noeuds.yml`). Les machines
+virtuelles lisent ce fichier dans `/vagrant/config/` par l'intermédiaire du script `scripts/plateforme.py`.
+C'est de lui que sont déduits la liste des serveurs dans HAProxy, la configuration de keepalived (pairs,
+interface, IP virtuelle), le fichier `/etc/hosts` de chaque machine et les cibles de Prometheus. Aucune
+adresse n'est écrite en dur dans un script ou dans une configuration.
 
-### 2.4 Cloisonnement réseau (R8)
+### 2.4 Cloisonnement du réseau (R8)
 
 Tout le trafic interne passe par le réseau privé `192.168.59.0/24`. Le seul port redirigé vers l'hôte est
-`127.0.0.1:8080 → lb1:80` (lié à la boucle locale : invisible depuis le réseau de la salle). Les ports
-SSH (2222, 2200…) sont ceux que Vagrant ajoute pour son propre accès. La page de statistiques HAProxy
-(`:8404`) n'écoute que sur l'IP privée du répartiteur.
+le port 8080, qui mène au port 80 de lb1, et il n'est ouvert que sur l'adresse locale `127.0.0.1` : il
+n'est donc pas visible depuis le réseau de la salle. Les autres ports redirigés (2222, 2200, etc.) sont
+ceux que Vagrant ajoute pour son propre accès SSH. La page de statistiques de HAProxy (port 8404)
+n'écoute que sur l'adresse privée du répartiteur.
 
 ## 3. Justification des choix
 
-### 3.1 Répartition : HAProxy (PORGO)
+### 3.1 Répartition de charge avec HAProxy (PORGO)
 
-| Besoin | Réponse HAProxy | Pourquoi pas Nginx |
+| Besoin | Ce que fait HAProxy | Pourquoi pas Nginx |
 |---|---|---|
-| R4 : n'envoyer du trafic qu'aux serveurs sains | **Sonde active** `GET /sante` toutes les secondes (`option httpchk`, `http-check expect status 200`) | Nginx libre ne fait que des contrôles **passifs** (il découvre la panne sur une requête d'utilisateur) ; les sondes actives sont réservées à Nginx Plus |
-| V2 : aucune erreur visible quand un serveur tombe | `retry-on conn-failure empty-response response-timeout` + `option redispatch` : la requête est rejouée sur un autre serveur | Possible (`proxy_next_upstream`) mais sans sonde active |
-| R3 : ajouter des serveurs sans coupure | `systemctl reload` : nouveau processus, connexions en cours conservées | Équivalent |
-| Observer la répartition | En-tête `X-Serveur`, page de stats, exportateur Prometheus intégré (`+PROMEX`) | Statistiques limitées en version libre |
+| N'envoyer du trafic qu'aux serveurs en bonne santé (R4) | Une sonde active interroge `GET /sante` chaque seconde (`option httpchk`, `http-check expect status 200`) | La version libre de Nginx ne fait que des contrôles passifs : elle découvre la panne sur la requête d'un utilisateur. Les sondes actives sont réservées à Nginx Plus |
+| Ne pas montrer d'erreur quand un serveur tombe (V2) | `retry-on conn-failure empty-response response-timeout` et `option redispatch` rejouent la requête sur un autre serveur | Possible avec `proxy_next_upstream`, mais sans sonde active |
+| Ajouter des serveurs sans coupure (R3) | `systemctl reload` démarre un nouveau processus et garde les connexions en cours | Équivalent |
+| Observer la répartition | En-tête `X-Serveur`, page de statistiques, exportateur Prometheus intégré au paquet | Statistiques limitées dans la version libre |
 
-**Calcul du délai d'éviction (R4).** `inter 1s` (une sonde par seconde), `fall 2` (deux échecs
-consécutifs). Pour une sonde, HAProxy borne la **connexion** par `timeout connect` (1 s) et la **lecture**
-de la réponse par `timeout check` (3 s). Pire cas pour une panne franche (VM éteinte, service arrêté,
-connexion refusée) : 1 s (attente de la sonde) + 2 × 1 s ≈ 3 s, donc moins de 5 s. **Mesuré : 1,04 s avec
-l'application de test, 1,39 s avec l'application finale** (§ 6). `rise 2` évite qu'un serveur instable soit
-réintégré sur un seul succès.
+Pour le délai d'éviction (R4), la sonde passe chaque seconde (`inter 1s`) et un serveur est écarté après
+deux échecs consécutifs (`fall 2`). HAProxy limite la connexion de la sonde à 1 seconde (`timeout connect`)
+et la lecture de sa réponse à 3 secondes (`timeout check`). Pour une panne franche, comme une machine
+éteinte, un service arrêté ou une connexion refusée, le pire cas est donc d'environ 3 secondes : une
+seconde d'attente avant la sonde, puis deux sondes d'une seconde. Nous avons mesuré 1,04 s avec une
+application de test, puis 1,39 s et 1,28 s avec l'application finale (section 6). Le réglage `rise 2`
+évite de réintégrer un serveur instable sur un seul succès.
 
-**Pourquoi 3 s de lecture et non 1 s** (correction du 23/10, trouvée au test d'intégration de la bascule) :
-après la bascule, bdd1 est éteinte et libpq essaie d'abord bdd1 avant bdd2, si bien que `/sante` répond
-200 en 0,6 à 2,1 s. Avec `timeout check 1s`, la sonde déclarait ces serveurs **sains** hors service
-(`L7TOUT`) et le service restait en 503 après une bascule pourtant réussie. **Compromis assumé** : un
-serveur *gelé* (qui accepte la connexion mais ne répond plus) serait écarté en 1 + 2 × 3 ≈ 7 s au pire, au-delà
-des 5 s ; ce cas n'entre pas dans les scénarios V2/V4, et le rejeu `retry-on response-timeout` protège tout de
-même les requêtes des utilisateurs. Le détour par l'hôte éteint ne dure que jusqu'à la remise en service de
-bdd1 comme réplique (§ 5.3) : `/sante` répond alors en 0,33 s.
+Le délai de lecture était au départ d'une seconde. Nous l'avons porté à 3 secondes le 23 octobre, après un
+test d'intégration de la bascule de la base. Une fois bdd1 éteinte, la bibliothèque libpq essaie d'abord
+bdd1 avant de passer à bdd2, si bien que `/sante` répond 200 en 0,6 à 2,1 secondes. Avec une seconde de
+délai, la sonde déclarait hors service des serveurs qui fonctionnaient (état `L7TOUT`), et le service
+restait en 503 alors que la bascule avait réussi. Ce réglage a un coût : un serveur figé, qui accepte la
+connexion mais ne répond plus, serait écarté en 7 secondes environ dans le pire cas, donc au-delà des
+5 secondes demandées. Ce cas ne fait pas partie des scénarios V2 et V4, et le rejeu sur `response-timeout`
+protège quand même les requêtes des utilisateurs. Le détour par la machine éteinte disparaît d'ailleurs dès
+que bdd1 est remise en service comme réplique (section 5.3) : `/sante` répond alors en 0,33 s.
 
-La configuration est **engendrée** par `scripts/generer_config_lb.py` puis validée par `haproxy -c`
-**avant** d'être installée : une erreur arrête le provisionnement au lieu de casser un répartiteur en service.
+La configuration de HAProxy est générée par `scripts/generer_config_lb.py`, puis vérifiée par `haproxy -c`
+avant d'être installée. Une configuration incorrecte arrête donc le provisionnement au lieu de casser un
+répartiteur en service.
 
-### 3.2 Application sans état, connexion multi-hôtes `target_session_attrs` (KOBENDE)
+### 3.2 Une application sans état qui suit la bascule de la base (KOBENDE)
 
-Le service (`app/app.py`, 87 lignes) n'utilise que la bibliothèque standard (`ThreadingHTTPServer`) et
-`psycopg2`, installé par apt (`python3-psycopg2`) : aucun `pip`, donc aucun téléchargement imprévisible
-pendant le provisionnement.
+Le service (`app/app.py`, 87 lignes) n'utilise que la bibliothèque standard de Python
+(`ThreadingHTTPServer`) et `psycopg2`, installé avec apt (`python3-psycopg2`). Nous n'utilisons pas `pip`,
+ce qui évite des téléchargements imprévisibles pendant le provisionnement.
 
-| Besoin | Choix dans l'application | Pourquoi |
+| Besoin | Choix dans l'application | Raison |
 |---|---|---|
-| R3 / V2 : n'importe quel serveur peut répondre | **Aucun état** : ni session, ni fichier, ni compteur ; une connexion à la base par requête, toujours refermée (`finally`) | HAProxy peut envoyer chaque requête, ou la rejouer, sur n'importe quel serveur ; ajouter ou perdre un serveur ne perd aucune donnée |
-| V4 : survivre à la bascule de la base sans rien modifier | `host=<bdd1>,<bdd2>` et `target_session_attrs=read-write` | libpq essaie les hôtes dans l'ordre et ne garde que celui qui **accepte les écritures**. Avant la bascule, c'est bdd1 ; bdd1 éteinte, bdd2 encore réplique est refusée, donc `/sante` = 503 ; après `pg_promote()`, la même chaîne trouve bdd2 et `/sante` repasse à 200, sans redémarrer l'application |
-| R4 : la sonde de HAProxy doit dire la vérité | `/sante` exécute un vrai `SELECT 1` ; 200 seulement s'il réussit | Un serveur dont la base est perdue est retiré de la répartition au lieu de renvoyer des erreurs aux utilisateurs |
-| Réponse rapide même si la base est morte | `connect_timeout=2` et `statement_timeout=2000` | Une requête n'attend jamais indéfiniment : la sonde reçoit sa réponse sous les 5 s exigées (503 mesuré en 2,1 s sans base) |
-| Pas de trace brute visible | Toute `psycopg2.Error` devient un JSON `503` ; requête SQL paramétrée (`%s`) | Erreurs propres pour l'utilisateur ; protection contre l'injection SQL sur le matricule |
-| Démarrer avant la base | La connexion n'est ouverte qu'à la requête | Le service démarre même si bdd1 n'est pas prête : il répond 503 puis 200 dès que la base est là |
+| N'importe quel serveur doit pouvoir répondre (R3, V2) | Aucun état local : ni session, ni fichier, ni compteur. Une connexion à la base par requête, toujours refermée | HAProxy peut envoyer ou rejouer chaque requête sur n'importe quel serveur. Ajouter ou perdre un serveur ne fait perdre aucune donnée |
+| Survivre à la bascule de la base sans rien modifier (V4) | Chaîne de connexion `host=<bdd1>,<bdd2>` avec `target_session_attrs=read-write` | libpq essaie les hôtes dans l'ordre et ne garde que celui qui accepte les écritures. Avant la bascule, c'est bdd1. Quand bdd1 est éteinte, bdd2 encore réplique est refusée et `/sante` renvoie 503. Après `pg_promote()`, la même chaîne trouve bdd2 et `/sante` repasse à 200, sans redémarrer l'application |
+| La sonde de HAProxy doit dire la vérité (R4) | `/sante` exécute réellement `SELECT 1` et ne renvoie 200 que si la requête réussit | Un serveur qui a perdu sa base sort de la répartition au lieu de renvoyer des erreurs |
+| Répondre vite même si la base ne répond plus | `connect_timeout=2` et `statement_timeout=2000` | Une requête n'attend jamais indéfiniment. Sans base, le 503 arrive en 2,1 s |
+| Ne jamais afficher d'erreur brute | Toute erreur `psycopg2.Error` devient une réponse JSON 503, et la requête SQL est paramétrée | L'utilisateur reçoit une erreur propre, et le matricule ne peut pas servir à une injection SQL |
+| Démarrer avant la base | La connexion n'est ouverte qu'au moment d'une requête | Le service démarre même si bdd1 n'est pas prête, répond 503, puis 200 dès que la base est disponible |
 
-**Déploiement** (`scripts/app.sh`) : `app.py` est copié dans `/opt/resultats-bf/` (on n'exécute jamais
-depuis le dossier synchronisé `/vagrant`). La configuration `/etc/resultats-bf/app.env` est construite
-avec `plateforme ip bdd1` / `plateforme ip bdd2` (aucune adresse en dur, R3) et `$PG_MDP_APP` venu du
-`.env` (aucun secret versionné, R7) ; elle est en mode **600**, propriété de root : systemd la lit avant de
-lancer le service. Le service systemd `resultats-app` tourne sous un **utilisateur système dédié**, non
-root, avec `ProtectSystem=strict`, et `Restart=always` le relance en 1 s s'il s'arrête. Chaque fichier
-passe par `installer_si_change` : le service n'est redémarré que si `app.py`, `app.env` ou l'unité ont
-réellement changé, ce qui rend le script idempotent (R2).
+Le script `scripts/app.sh` copie `app.py` dans `/opt/resultats-bf/`, pour ne jamais exécuter le programme
+depuis le dossier partagé `/vagrant`. Il construit le fichier de configuration `/etc/resultats-bf/app.env`
+à partir des adresses de bdd1 et bdd2 lues dans la source de vérité et du mot de passe `PG_MDP_APP` fourni
+par le `.env`. Ce fichier appartient à root et n'est lisible que par lui (mode 600). Le service systemd
+`resultats-app` tourne sous un utilisateur système dédié, avec `ProtectSystem=strict`, et `Restart=always`
+le relance au bout d'une seconde s'il s'arrête. Chaque fichier passe par la fonction `installer_si_change`,
+si bien que le service n'est redémarré que lorsque l'un d'eux a réellement changé (R2).
 
-### 3.3 PostgreSQL et réplication en flux, choix asynchrone et son RPO (OUEDRAOGO)
+### 3.3 PostgreSQL, réplication en flux et perte de données possible (OUEDRAOGO)
 
-| Besoin | Choix | Pourquoi |
+| Besoin | Choix | Raison |
 |---|---|---|
-| Un volume de données réaliste pour les mesures | Table `resultats(matricule PK, nom, serie, moyenne, admis)`, **50 000 lignes** engendrées par `generate_series` (matricules `BF000001` à `BF050000`, moyenne déterministe entre 0 et 20) | Même jeu de données à chaque reconstruction (R1) ; insertion en `ON CONFLICT DO NOTHING` : rejouable (R2) |
-| R5 : une seconde copie toujours à jour | **Réplication physique en flux** (`pg_basebackup -R -X stream` depuis bdd1) | Mécanisme natif de PostgreSQL 16, sans logiciel supplémentaire ; bdd2 est une copie exacte, promouvable par `pg_promote()` |
-| Choix asynchrone | Réglage par défaut (`synchronous_standby_names` vide) | Une écriture n'attend pas bdd2 : bdd1 reste disponible même si bdd2 tombe. Le prix est un **RPO non nul** : les dernières transactions non encore transmises sont perdues si bdd1 tombe. Mesuré : une écriture sur le primaire est lue sur la réplique moins d'une seconde après (§ 5.3). Pour RÉSULTATS-BF, l'application ne fait que **lire** des données chargées au provisionnement : le RPO effectif est nul |
-| Sécurité des accès | `pg_hba.conf` engendré : `app_resultats` (SELECT seulement) et `replicateur` (REPLICATION) acceptés uniquement depuis `192.168.59.0/24`, en `scram-sha-256` ; mots de passe passés par l'environnement | Moindre privilège ; aucun secret dans le dépôt (R7) ; aucun accès extérieur au réseau privé (R8) |
-| Durabilité | Données dans `/var/lib/postgresql/16/main`, **jamais** dans `/vagrant` | Le dossier synchronisé de VirtualBox ne garantit ni les verrous ni `fsync` (piège connu de l'énoncé) |
-| Ne jamais écraser une base à jour | Garde-fous : `replique.sh` ne recopie que si bdd2 n'a pas encore la base ; `bdd.sh` n'écrit rien sur une réplique | Le provisionnement reste rejouable même après une bascule (§ 5.3) |
+| Un volume de données suffisant pour les mesures | Une table `resultats(matricule, nom, serie, moyenne, admis)` remplie de 50 000 lignes par `generate_series`, avec des matricules de `BF000001` à `BF050000` et des moyennes calculées de façon déterministe entre 0 et 20 | On retrouve exactement les mêmes données à chaque reconstruction (R1). L'insertion utilise `ON CONFLICT DO NOTHING`, ce qui la rend rejouable (R2) |
+| Garder une deuxième copie à jour (R5) | Réplication physique en flux, initialisée par `pg_basebackup -R -X stream` depuis bdd1 | C'est le mécanisme intégré à PostgreSQL 16, sans logiciel en plus. bdd2 est une copie exacte que l'on peut promouvoir avec `pg_promote()` |
+| Réplication synchrone ou asynchrone | Asynchrone, le réglage par défaut | Une écriture n'attend pas bdd2, donc bdd1 reste disponible même si bdd2 tombe. En contrepartie, les dernières transactions pas encore transmises seraient perdues si bdd1 tombait. Dans nos mesures, une écriture est lisible sur la réplique en moins d'une seconde. Comme notre application ne fait que lire des données chargées à l'installation, aucune donnée ne peut être perdue en pratique |
+| Sécuriser les accès | `pg_hba.conf` généré : l'utilisateur `app_resultats` (lecture seule) et l'utilisateur `replicateur` ne sont acceptés que depuis `192.168.59.0/24`, avec `scram-sha-256`. Les mots de passe arrivent par l'environnement | Chaque compte n'a que les droits nécessaires, aucun secret n'est dans le dépôt (R7) et aucun accès n'est possible depuis l'extérieur du réseau privé (R8) |
+| Ne pas abîmer les données | Données dans `/var/lib/postgresql/16/main`, jamais dans `/vagrant` | Le dossier partagé de VirtualBox ne respecte ni les verrous ni `fsync`, comme le rappelle l'énoncé |
+| Ne jamais écraser une base à jour | `replique.sh` ne recopie bdd1 que si bdd2 n'a pas encore la base, et `bdd.sh` n'écrit rien sur une réplique | Le provisionnement reste rejouable même après une bascule (section 5.3) |
 
-### 3.4 Haute disponibilité du répartiteur : VRRP avec keepalived (PORGO)
+### 3.4 Doubler le répartiteur avec VRRP et keepalived (PORGO)
 
-Un répartiteur unique est un point de défaillance unique. lb1 et lb2 exécutent la même configuration
-HAProxy ; keepalived (2.2.8) leur fait partager l'IP virtuelle `192.168.59.5` par VRRP :
+Un répartiteur unique serait lui-même un point de défaillance. lb1 et lb2 ont donc la même configuration
+HAProxy, et keepalived (version 2.2.8) leur fait partager l'IP virtuelle `192.168.59.5` par VRRP.
 
-- **Priorités** 150 (lb1) et 100 (lb2), engendrées depuis l'ordre de la table ; annonce toutes les secondes
-  (`advert_int 1`). Si lb2 n'entend plus lb1 pendant ≈ 3 annonces, il prend l'IP et émet un ARP gratuit
-  pour que l'hôte mette à jour son cache.
-- **Suivi de HAProxy** (`vrrp_script` + `systemctl is-active haproxy`) : une machine dont HAProxy est
-  arrêté abandonne l'IP, même si elle est allumée.
-- **Unicast** (`unicast_peer`) plutôt que multicast : aucune dépendance au comportement du réseau hôte-seul.
-- **Les deux en `BACKUP` avec `preempt_delay 10`** : au retour de lb1, il attend 10 s (HAProxy prêt) avant de
-  reprendre l'IP ; vérifié (§ 6).
-- Mot de passe VRRP lu dans `.env` (8 caractères maximum, limite de keepalived), fichier en mode 600.
+Les priorités sont de 150 pour lb1 et de 100 pour lb2, et elles sont déduites de l'ordre de la table. Le
+répartiteur actif envoie une annonce chaque seconde (`advert_int 1`). Si lb2 ne reçoit plus d'annonce de
+lb1 pendant environ trois secondes, il prend l'adresse et prévient le réseau par un ARP gratuit, pour que
+l'hôte mette à jour son cache. keepalived surveille aussi HAProxy (`vrrp_script` avec
+`systemctl is-active haproxy`) : une machine dont HAProxy est arrêté abandonne l'adresse, même si elle reste
+allumée. Les annonces sont envoyées en unicast plutôt qu'en multicast, pour ne pas dépendre du comportement
+du réseau hôte de VirtualBox. Les deux machines démarrent en état `BACKUP` avec `preempt_delay 10` : quand
+lb1 revient, il attend 10 secondes, le temps que HAProxy soit prêt, avant de reprendre l'adresse. Le mot
+de passe VRRP est lu dans `.env` (keepalived n'accepte pas plus de 8 caractères) et le fichier qui le
+contient est protégé en mode 600.
 
-L'IP virtuelle, et non `localhost:8080`, est l'adresse du service : la redirection de port de Vagrant passe
-par la carte NAT de lb1 et disparaît avec lui.
+C'est bien l'IP virtuelle, et non `localhost:8080`, qui constitue l'adresse du service : la redirection de
+port de Vagrant passe par la carte réseau NAT de lb1 et disparaît avec lui.
 
-### 3.5 Observabilité : Prometheus + Grafana, extension E2 (THIOMBIANO)
+### 3.5 Supervision avec Prometheus et Grafana, extension E2 (THIOMBIANO)
 
-```
- node_exporter :9100, sur CHAQUE machine ──┐  CPU, mémoire, « la machine répond-elle ? »
- HAProxy lb1/lb2 :8404/metrics ────────────┤  débit et état UP/DOWN de chaque serveur applicatif
-                                           ▼
-                obs : Prometheus :9090     interroge toutes les cibles toutes les 5 s et stocke les séries
-                                           ▼
-                obs : Grafana :3000        tableau de bord « RÉSULTATS-BF — plateforme »
-```
+Le circuit des métriques est le suivant. Sur chaque machine, `node_exporter` publie sur le port 9100 l'état
+du processeur, de la mémoire et le simple fait que la machine répond. HAProxy publie de son côté, sur le
+port 8404, le débit et l'état de chaque serveur applicatif. Prometheus, installé sur obs, interroge toutes
+ces cibles toutes les 5 secondes et conserve les séries. Grafana, sur la même machine, les affiche dans un
+tableau de bord intitulé « RÉSULTATS-BF, plateforme ».
 
-| Besoin | Choix | Pourquoi |
+| Besoin | Choix | Raison |
 |---|---|---|
-| Voir chaque machine | `prometheus-node-exporter` installé par `commun.sh` sur toutes les machines quand E2 est active (même appel apt que le socle) | Paquet Ubuntu, aucun téléchargement extérieur ; une machine éteinte se voit immédiatement (`up = 0`) |
-| Voir la répartition et la santé vue par HAProxy | Exportateur Prometheus **intégré** à HAProxy (`/metrics`, déjà compilé dans le paquet) | Aucune pièce de plus : on lit directement le compteur de réponses et l'état de la sonde `/sante` de chaque serveur |
-| Aucune adresse en dur (R3) | `prometheus.yml` **engendré** par `obs.sh` depuis `plateforme.json`, validé par `promtool check config` avant d'être installé ; le rôle obs est rejoué à chaque `vagrant up` (`run: "always"`, comme le répartiteur) | Avec `NB_APP=4`, app3 et app4 apparaissent seules dans Prometheus : mesuré, « Prometheus reconfiguré : 9 machine(s) », puis 7 au retour à N=2 |
-| Tableau de bord reproductible (R1) | Source de données et tableau de bord **provisionnés par fichiers** (`config/grafana/`), sans aucun clic | Un `vagrant destroy` ne perd rien : le tableau de bord est du code versionné |
-| Secret (R7) | Mot de passe admin `GRAFANA_MDP` lu dans `.env`, fichier d'environnement en mode 600 | Aucun mot de passe dans le dépôt |
-| Cloisonnement (R8) | Grafana et Prometheus joignables seulement sur l'IP privée de obs, aucun port redirigé | Seul le répartiteur expose un port vers l'hôte |
+| Suivre chaque machine | `prometheus-node-exporter` installé par `commun.sh` sur toutes les machines quand E2 est activée, dans le même appel apt que le socle | Paquet Ubuntu, sans téléchargement extérieur. Une machine éteinte se voit tout de suite |
+| Suivre la répartition et la santé vues par HAProxy | L'exportateur Prometheus déjà intégré au paquet HAProxy | Aucun composant de plus : on lit directement les compteurs de réponses et l'état de la sonde de chaque serveur |
+| Pas d'adresse écrite en dur (R3) | `prometheus.yml` est généré par `obs.sh` à partir de `plateforme.json`, vérifié par `promtool check config`, et le rôle obs est rejoué à chaque `vagrant up` | Avec `NB_APP=4`, app3 et app4 apparaissent seules dans Prometheus : le journal indique « Prometheus reconfiguré : 9 machine(s) », puis 7 au retour à deux serveurs |
+| Un tableau de bord reproductible (R1) | La source de données et le tableau de bord sont décrits par des fichiers (`config/grafana/`), sans aucune manipulation à la souris | Un `vagrant destroy` ne fait rien perdre, puisque le tableau de bord est du code versionné |
+| Pas de mot de passe dans le dépôt (R7) | Le mot de passe administrateur `GRAFANA_MDP` est lu dans `.env` et placé dans un fichier en mode 600 | Le dépôt ne contient aucun secret |
+| Cloisonnement (R8) | Grafana et Prometheus ne sont joignables que sur l'adresse privée de obs | Seul le répartiteur expose un port vers l'hôte |
 
-**Le tableau de bord** compte six panneaux : débit par serveur (réponses/s comptées par HAProxy) ;
-état de chaque serveur selon la sonde `/sante` ; machines joignables ; CPU par machine ; réponses par
-code HTTP (2xx en vert, 5xx en rouge) ; **historique de disponibilité** (frise, une ligne par machine),
-qui garde la trace des pannes provoquées par les scénarios. Les captures C2 à C6b (§ 6) en sont issues.
+Le tableau de bord contient six panneaux : le débit par serveur, l'état de chaque serveur selon la sonde
+`/sante`, les machines joignables, le processeur de chaque machine, les réponses par code HTTP (2xx en
+vert, 5xx en rouge) et un historique de disponibilité, avec une ligne par machine, qui garde la trace des
+pannes provoquées pendant les scénarios. Les captures de la section 6 en sont tirées.
 
-**Difficulté rencontrée.** Au premier déploiement, Grafana 13 a mis **10 minutes** à démarrer, et le
-provisionnement a échoué au bout du délai d'attente (`tests/resultats/e2_obs_20261024_123257.log`).
-Son journal montrait qu'il chargeait une douzaine de sources de données intégrées (Loki, MySQL,
-Elasticsearch…), chacune comme **un processus séparé** : les 768 Mo de obs saturaient, au point que le
-noyau tuait des services système. Correction : `GF_PLUGINS_DISABLE_PLUGINS` (on ne garde que le plugin
-Prometheus) et `GF_PLUGINS_PREINSTALL_DISABLED`. Le provisionnement suivant a pris **1 min 08 s**, et
-le rejeu suivant n'a rien changé (« Prometheus inchangé », « Grafana inchangé » : R2).
+Nous avons rencontré deux difficultés avec Grafana. Au premier déploiement, Grafana 13 a mis 10 minutes à
+démarrer et le provisionnement a échoué en dépassant son délai d'attente
+(`tests/resultats/e2_obs_20261024_123257.log`). Son journal montrait qu'il chargeait une douzaine de
+sources de données intégrées (Loki, MySQL, Elasticsearch, etc.), chacune dans un processus séparé : les
+768 Mo de obs ne suffisaient plus et le noyau tuait des services système. Nous avons désactivé tous les
+plugins sauf celui de Prometheus (`GF_PLUGINS_DISABLE_PLUGINS` et `GF_PLUGINS_PREINSTALL_DISABLED`). Le
+provisionnement suivant a pris 1 min 08 s, et un nouveau passage n'a rien modifié. Plus tard, lors de la
+validation finale du 25 octobre sur le poste de PORGO, le dépôt `apt.grafana.com` était injoignable depuis
+le réseau utilisé, alors que `dl.grafana.com` répondait. Depuis, `obs.sh` installe Grafana 13.2.4 à partir
+du paquet publié sur `dl.grafana.com`, vérifie son empreinte SHA-256 inscrite dans le script et le garde en
+cache dans le dossier `.cache/` du projet. La reconstruction ne dépend donc plus de ce dépôt, et elle ne
+télécharge plus Grafana qu'une seule fois.
 
-### 3.6 Points de défaillance unique supprimés, et ceux qui restent (tous)
+### 3.6 Points de défaillance supprimés et points restants (groupe)
 
 | Composant | Avant | Après |
 |---|---|---|
-| Répartiteur | lb1 seul | lb1 + lb2, IP virtuelle VRRP (E1) |
-| Serveur applicatif | — | N ≥ 2, sonde de santé, rejeu des requêtes |
-| Base de données | bdd1 seule | bdd1 + réplique en flux bdd2, bascule chronométrée (≈ 3 s), réintégration automatique de l'ancien primaire |
+| Répartiteur | lb1 seul | lb1 et lb2 avec une IP virtuelle VRRP (E1) |
+| Serveur applicatif | un seul serveur | au moins deux serveurs, sonde de santé et rejeu des requêtes |
+| Base de données | bdd1 seule | bdd1 répliquée en flux vers bdd2, bascule chronométrée en 3 s environ et réintégration automatique de l'ancien primaire |
 
-**Points de défaillance qui restent** : la bascule de la base est **manuelle** (il faut lancer
-`bascule_bdd.sh`) ; l'hôte physique unique (toutes les VM sur un seul ordinateur) ; le réseau hôte-seul
-unique ; la machine de supervision obs (sa perte n'interrompt pas le service).
+Il reste plusieurs points faibles. La bascule de la base est manuelle : il faut lancer `bascule_bdd.sh`.
+Toutes les machines virtuelles tournent sur un seul ordinateur et passent par un seul réseau hôte. La
+machine obs est unique, mais sa perte n'interrompt pas le service.
 
 ## 4. Reproductibilité et qualité (PORGO)
 
-- **R1, reconstruction.** Sur un clone neuf, `vagrant up` suffit : le `.env` absent est créé à partir de
-  `.env.exemple` avec des mots de passe aléatoires (`SecureRandom`), la box est épinglée
-  (`bento/ubuntu-24.04` `202510.26.0`), et tout le reste est installé par les scripts. Premier `vagrant up`
-  du socle mesuré : **1 433 s** (téléchargement de la box inclus) ; reconstruction complète
-  (`vagrant destroy -f && vagrant up`, bases, application et répartiteurs) : **1 934 s**.
-- **R2, idempotence.** Trois techniques : `installer_paquets` n'appelle apt que pour les paquets absents ;
-  `installer_si_change` n'écrase un fichier (et ne recharge le service) que si son contenu a changé ;
-  `/etc/hosts` est un bloc entre marqueurs réécrit à l'identique, jamais un `>>`. Vérifié par empreintes
-  SHA-256 avant et après un second `vagrant provision` sur les 6 machines (§ 6).
-- **R7, secrets.** Aucun mot de passe dans le dépôt : `.env` est ignoré par Git ; les valeurs passent aux
-  scripts par l'option `env:` du provisionneur ; les fichiers qui les contiennent dans les VM sont en mode 600.
-- **Fins de ligne.** `.gitattributes` impose LF : un script CRLF échouerait dans la VM (`bash\r`).
-- **Connexion lente.** Un seul appel apt par script ; index rafraîchi au plus toutes les 6 h ;
-  `DPkg::Lock::Timeout=300` absorbe le verrou d'unattended-upgrades au démarrage.
+Sur un clone neuf du dépôt, `vagrant up` suffit (R1). Si le fichier `.env` n'existe pas, il est créé à
+partir de `.env.exemple` avec des mots de passe aléatoires. La box est fixée à une version précise
+(`bento/ubuntu-24.04` en version `202510.26.0`) et tout le reste est installé par les scripts. Le premier
+`vagrant up` du socle a pris 1 433 s, téléchargement de la box compris. La reconstruction complète
+(`vagrant destroy -f && vagrant up`, avec les bases, l'application et les répartiteurs) a pris 1 934 s.
+
+Le provisionnement peut être rejoué sans effet (R2) grâce à trois techniques. La fonction
+`installer_paquets` n'appelle apt que pour les paquets absents. La fonction `installer_si_change` ne
+remplace un fichier, et ne recharge le service concerné, que si son contenu a changé. Enfin, `/etc/hosts`
+est géré comme un bloc délimité par deux marqueurs et réécrit à l'identique, jamais avec un ajout `>>`.
+Nous l'avons vérifié en comparant les empreintes SHA-256 des fichiers avant et après un second
+`vagrant provision` sur les six machines (section 6).
+
+Aucun mot de passe ne se trouve dans le dépôt (R7) : `.env` est ignoré par Git, les valeurs sont transmises
+aux scripts par l'option `env:` du provisionneur, et les fichiers qui les contiennent dans les machines sont
+en mode 600. Le fichier `.gitattributes` impose des fins de ligne Unix, car un script enregistré avec des
+fins de ligne Windows échouerait dans la machine virtuelle. Pour les connexions lentes, chaque script ne fait
+qu'un seul appel à apt, l'index n'est rafraîchi qu'une fois toutes les six heures, et l'option
+`DPkg::Lock::Timeout=300` permet d'attendre la fin des mises à jour automatiques au démarrage.
 
 ## 5. Procédures d'exploitation
 
-### 5.1 Ajouter (ou retirer) des serveurs applicatifs (PORGO)
+### 5.1 Ajouter ou retirer des serveurs applicatifs (PORGO)
 
-1. Mettre `NB_APP=4` dans `.env` (ou préfixer la commande : `NB_APP=4 vagrant up`).
-2. `vagrant up` : Vagrant crée app3 et app4 (provisionnées par `app.sh`), puis rejoue le rôle des
-   répartiteurs (`run: "always"`), qui réengendrent `haproxy.cfg` et rechargent HAProxy sans coupure.
-3. Contrôle : `http://192.168.59.11:8404/stats` montre 4 serveurs UP.
+Pour passer à quatre serveurs, il suffit de mettre `NB_APP=4` dans `.env` (ou de lancer
+`NB_APP=4 vagrant up`), puis d'exécuter `vagrant up`. Vagrant crée app3 et app4, qui sont installées par
+`app.sh`, puis rejoue le rôle des répartiteurs. Ceux-ci régénèrent `haproxy.cfg` et rechargent HAProxy sans
+couper les connexions en cours. La page `http://192.168.59.11:8404/stats` affiche alors quatre serveurs
+actifs.
 
-Pour revenir à 2 : `NB_APP=4 vagrant destroy -f app3 app4`, remettre `NB_APP=2`, puis `vagrant up`.
-Les deux sens ont été exécutés (§ 6).
+Pour revenir à deux serveurs, on détruit app3 et app4 (`NB_APP=4 vagrant destroy -f app3 app4`), on
+remet `NB_APP=2`, puis on relance `vagrant up`. Nous avons testé les deux sens (section 6).
 
-### 5.2 Bascule de la base : `bascule_bdd.sh`, étapes et durée (OUEDRAOGO)
+### 5.2 Bascule de la base (OUEDRAOGO)
 
-**Quand ?** bdd1 (primaire) est tombée : `/sante` renvoie 503 sur tous les serveurs applicatifs et HAProxy
-renvoie un 503 JSON (`{"erreur": "aucun serveur applicatif disponible"}`), jamais une page blanche.
-
-**Commande** (depuis l'hôte, à la racine du dépôt) :
+La bascule devient nécessaire quand bdd1, la base primaire, est tombée. Dans ce cas, `/sante` renvoie 503
+sur tous les serveurs applicatifs, et HAProxy répond lui aussi en JSON
+(`{"erreur": "aucun serveur applicatif disponible"}`), jamais par une page blanche. Depuis la racine du
+dépôt, on lance :
 
 ```bash
 time vagrant ssh bdd2 -c "sudo bash /vagrant/scripts/bascule_bdd.sh"
 ```
 
-**Étapes du script** :
+Le script commence par vérifier que l'ancien primaire est vraiment hors service, en tentant pendant deux
+secondes une connexion sur son port 5432. S'il répond encore, la promotion est annulée, car promouvoir bdd2
+alors que bdd1 fonctionne créerait deux bases primaires. Il promeut ensuite bdd2 avec
+`SELECT pg_promote(true, 60)`, uniquement si elle est encore une réplique, ce qui permet de relancer le
+script sans effet. Il attend que `pg_is_in_recovery()` renvoie `false`, pendant 120 secondes au plus, puis
+affiche l'heure de début, l'heure de fin et la durée.
 
-1. **Vérifier que l'ancien primaire est vraiment hors service** (tentative de connexion TCP de 2 s sur son
-   port 5432). S'il répond encore, la promotion est **annulée** : promouvoir bdd2 à côté d'un bdd1 vivant
-   créerait deux primaires.
-2. **Promouvoir** bdd2 : `SELECT pg_promote(true, 60)` (seulement si elle est encore en récupération,
-   donc rejouable sans effet).
-3. **Attendre** que `pg_is_in_recovery()` renvoie `false` (120 s au maximum, sinon échec explicite).
-4. **Afficher** l'heure de début, l'heure de fin et la durée.
+Rien ne change du côté de l'application : sa chaîne de connexion trouve seule le nouveau primaire. Le
+script fonctionne dans les deux sens : lancé sur bdd1, il promeut bdd1.
 
-Rien n'est à modifier côté application : sa chaîne de connexion `host=bdd1,bdd2 target_session_attrs=read-write`
-trouve d'elle-même le nouveau primaire. Le script est symétrique : lancé sur bdd1, il la promeut à la place de bdd2.
-
-**Mesures** :
-
-| Mesure | Résultat | Fichier brut |
+| Mesure | Résultat | Fichier |
 |---|---|---|
-| Durée de la promotion (script) | **2 s** (OUEDRAOGO), puis **3 s** à chaque test d'intégration (PORGO) | `bdd_20261023.log`, `integration_bascule_20261023_164927.log`, `reintegration_bdd1_20261023_173638.log` |
-| Retour du service après la fin de la bascule | **5,1 s** : HAProxy attend 2 sondes réussies (`rise 2`, `downinter 2s`) | `integration_bascule_20261023_164927.log` |
-| Commande complète vue de l'hôte | ≈ 10 s, dont ≈ 7 s d'établissement de la session `vagrant ssh` | idem |
+| Durée de la promotion | 2 s (OUEDRAOGO), puis 3 s à chaque test d'intégration (PORGO) | `bdd_20261023.log`, `integration_bascule_20261023_164927.log`, `reintegration_bdd1_20261023_173638.log` |
+| Retour du service après la fin de la bascule | 5,1 s, le temps que HAProxy obtienne deux sondes réussies (`rise 2`, `downinter 2s`) | `integration_bascule_20261023_164927.log` |
+| Commande complète vue de l'hôte | environ 10 s, dont 7 s pour ouvrir la session `vagrant ssh` | même fichier |
 
-**Après la bascule** : remettre bdd1 en service (§ 5.3).
+Une fois la bascule faite, il faut remettre bdd1 en service (section 5.3).
 
-### 5.3 Remise en service de bdd1 comme nouvelle réplique (PORGO, pour OUEDRAOGO)
+### 5.3 Remettre bdd1 en service comme réplique (PORGO, pour OUEDRAOGO)
 
-**Le problème.** Après une bascule, bdd2 est primaire. Quand on rallume bdd1, systemd relance PostgreSQL
-**en primaire** : il y a deux primaires (« cerveau divisé »). Comme la chaîne de connexion des applications
-essaie bdd1 en premier, elles liraient l'ancienne base, à laquelle il manque tout ce qui a été écrit depuis la
-panne. Deuxième danger : rejouer `replique.sh` sur bdd2 promue l'aurait **effacée** pour la recopier depuis
-l'ancien primaire.
+Après une bascule, bdd2 est devenue primaire. Si l'on rallume bdd1, systemd redémarre PostgreSQL en
+primaire, et l'on se retrouve avec deux bases primaires. Comme la chaîne de connexion des applications
+essaie bdd1 en premier, elles liraient l'ancienne base, à laquelle il manque tout ce qui a été écrit depuis
+la panne. Un deuxième problème se posait : relancer `replique.sh` sur bdd2, devenue primaire, l'aurait
+effacée pour la recopier depuis l'ancien primaire.
 
-**La procédure : une seule commande, `vagrant up bdd1`.** Le provisionneur `reintegrer`
-(`scripts/reintegrer_bdd.sh`, rejoué à chaque `vagrant up` des deux bases) fait le travail :
+La remise en service se fait maintenant avec une seule commande, `vagrant up bdd1`. Le script
+`scripts/reintegrer_bdd.sh`, rejoué à chaque `vagrant up` des deux bases, s'occupe du reste. Si la machine
+est déjà une réplique, ou si l'autre base ne répond pas, il ne fait rien. Sinon, il compare les « lignes
+de temps » (timelines) de PostgreSQL : la sienne, lue avec `pg_controldata`, et celle de l'autre base,
+obtenue par la commande de réplication `IDENTIFY_SYSTEM`. Chaque promotion augmente ce numéro de un. Si
+l'autre base a un numéro plus récent, c'est que la machine courante est l'ancien primaire. Dans ce seul cas,
+le script arrête PostgreSQL, efface les données périmées, recopie le nouveau primaire avec
+`pg_basebackup -R`, redémarre en réplique et vérifie que les données arrivent bien.
 
-1. Si la machine est déjà une réplique (`standby.signal`), ou si l'autre base est injoignable, il ne fait rien.
-2. Il compare les **lignes de temps** PostgreSQL : la sienne (`pg_controldata`) et celle de l'autre base
-   (commande de réplication `IDENTIFY_SYSTEM`). Chaque promotion incrémente la ligne de temps : si l'autre
-   est plus récente, cette machine est l'ancien primaire.
-3. Dans ce seul cas : arrêt de PostgreSQL, effacement des données périmées, `pg_basebackup -R` depuis
-   le nouveau primaire, redémarrage en réplique, et vérification que le flux est bien reçu (`streaming`).
-
-Le script est **symétrique** (il sert aussi si bdd2 tombe à son tour), comme `bascule_bdd.sh`, qui promeut
-désormais la machine où on le lance. Deux garde-fous complètent la procédure : `bdd.sh` n'écrit plus rien si
-bdd1 est réplique, et `replique.sh` refuse de réinitialiser bdd2 si elle contient déjà la base (promue).
-
-**Mesures** (fichier `reintegration_bdd1_*.log`) :
+Le script fonctionne aussi dans l'autre sens, si bdd2 tombe à son tour. Deux protections le complètent :
+`bdd.sh` n'écrit plus rien quand bdd1 est une réplique, et `replique.sh` ne réinitialise jamais bdd2 si
+elle contient déjà la base.
 
 | Étape | Résultat |
 |---|---|
-| État nominal, `--provision-with reintegrer` sur bdd1 | « primaire à jour (ligne de temps 1, bdd2 : 1) » : rien fait |
-| Bascule (`halt bdd1` puis `bascule_bdd.sh` sur bdd2) | 3 s |
+| Situation normale, réintégration lancée sur bdd1 | « primaire à jour (ligne de temps 1, bdd2 : 1) » : rien n'est fait |
+| Arrêt de bdd1, puis bascule sur bdd2 | promotion en 3 s |
 | Écriture sur bdd2 pendant que bdd1 est éteinte | ligne `REPRISE01` insérée |
-| `vagrant up bdd1` | ancien primaire détecté (ligne de temps 1 < 2), **converti en réplique en 39 s** ; commande complète 208 s (démarrage de la VM compris) |
-| Données | `REPRISE01` présente sur bdd1 ; nouvelle écriture sur bdd2 lue sur bdd1 1 s après ; 50 002 lignes de chaque côté |
-| Service | `/sante` 200 en 0,33 s (contre ≈ 2 s tant que bdd1 était éteinte : libpq écarte vite une réplique joignable) |
-| R2 après bascule | `vagrant provision` ×2 sur bdd1 (réplique) et bdd2 (primaire) : 4 × code 0, aucune écriture, aucune réinitialisation |
+| `vagrant up bdd1` | ancien primaire détecté (ligne de temps 1 contre 2), converti en réplique en 39 s. La commande complète dure 208 s, démarrage de la machine compris |
+| Données | `REPRISE01` est présente sur bdd1, une nouvelle écriture sur bdd2 apparaît sur bdd1 une seconde plus tard, et les deux bases comptent 50 002 lignes |
+| Service | `/sante` répond 200 en 0,33 s, contre 2 s environ tant que bdd1 était éteinte |
+| Provisionnement rejoué après la bascule | deux passages sur bdd1 (réplique) et sur bdd2 (primaire) : quatre succès, aucune écriture et aucune réinitialisation |
 
-**Limite connue, mesurée.** Entre le démarrage de la VM et le passage du provisionneur, bdd1 tourne en
-primaire périmé pendant **42,7 s** (journal systemd : démarrage 17:41:07,3, arrêt 17:41:50,1). Pendant
-cette fenêtre, une application peut lire des données périmées ; elle ne peut pas créer d'écritures
-divergentes, car le service est en lecture seule. Amélioration possible : une condition de démarrage
-systemd (`ExecStartPre`) sur PostgreSQL qui fasse la même comparaison des lignes de temps **avant** de
-démarrer, ce qui fermerait la fenêtre.
+Ces mesures sont dans `reintegration_bdd1_20261023_173638.log`. Il reste une limite : entre le démarrage de
+la machine et le passage du script, bdd1 fonctionne comme un primaire périmé pendant 42,7 s (journal systemd :
+démarrage à 17:41:07,3, arrêt à 17:41:50,1). Pendant ce court laps de temps, une application peut lire des
+données périmées, mais elle ne peut pas écrire de données divergentes puisque le service ne fait que lire.
+Pour supprimer cette fenêtre, il faudrait faire la même comparaison avant le démarrage de PostgreSQL, par
+exemple avec une condition `ExecStartPre` dans systemd.
 
 ### 5.4 Panne et retour d'un répartiteur (PORGO)
 
-- **Panne de lb1** : rien à faire. lb2 prend l'IP virtuelle en moins de 2 s (mesuré).
-- **Retour** : `vagrant up lb1`. Le rôle est rejoué (sans changement), keepalived redémarre ; 10 s plus tard
-  lb1 reprend l'IP (priorité supérieure). Vérification : `vagrant ssh lb1 -c "ip -4 addr show eth1"` montre
-  `192.168.59.5`.
-- **Panne de HAProxy seul** sur lb1 (machine allumée) : le `vrrp_script` la détecte et l'IP passe à lb2.
-  Mesuré : `systemctl stop haproxy` sur lb1, lb2 entre en état MASTER **2,59 s** plus tard (journal
-  keepalived, horloges des deux VM), le service reste joignable (200) ; au redémarrage de HAProxy, lb1
-  reprend l'IP.
+Si lb1 tombe, il n'y a rien à faire : lb2 prend l'IP virtuelle en moins de deux secondes. Pour le remettre
+en service, on lance `vagrant up lb1`. Son rôle est rejoué sans rien changer, keepalived redémarre, et lb1
+reprend l'adresse dix secondes plus tard grâce à sa priorité plus élevée. On peut le vérifier avec
+`vagrant ssh lb1 -c "ip -4 addr show eth1"`, qui doit afficher `192.168.59.5`.
 
-## 6. Résultats des scénarios (THIOMBIANO + responsables)
-Pour chaque scénario : **commande exacte**, **résultat brut** (renvoi au fichier de `tests/resultats/`), **tableau**, **commentaire honnête**.
+Nous avons aussi testé l'arrêt de HAProxy seul sur lb1, la machine restant allumée. Après
+`systemctl stop haproxy`, lb2 est passé en état MASTER 2,59 s plus tard (d'après le journal de keepalived
+et les horloges des deux machines), et le service est resté joignable. Au redémarrage de HAProxy, lb1 a
+repris l'adresse.
 
-Les scénarios V1 à V5 ont été mesurés le 24/10 sur le poste de THIOMBIANO (Intel Core i7-1185G7,
-4 cœurs / 8 threads, 15,7 Go de RAM, Windows 11 Professionnel, VirtualBox 7.2.6, Vagrant 2.4.9),
-plateforme complète avec E1 et E2 (7 machines virtuelles, 1 vCPU chacune). V6 et les vérifications
-R2 à R8 l'ont été le 23/10 sur le poste de PORGO (même modèle de processeur, génération voisine).
+## 6. Résultats des scénarios (THIOMBIANO et responsables)
 
-| Scénario | Mesure attendue | Résultat | Fichier brut |
+Pour chaque scénario, nous donnons la commande exacte, le fichier de résultats bruts, un tableau et notre
+analyse. Les scénarios V1 à V5 ont été mesurés le 24 octobre sur le poste de THIOMBIANO (Intel Core
+i7-1185G7, 4 cœurs et 8 threads, 15,7 Go de RAM, Windows 11 Professionnel, VirtualBox 7.2.6, Vagrant 2.4.9),
+avec la plateforme complète, extensions comprises (7 machines virtuelles d'un processeur virtuel chacune).
+V6 et les vérifications R2 à R8 ont été faites le 23 octobre sur le poste de PORGO, de configuration proche.
+
+| Scénario | Mesure attendue | Résultat | Fichiers |
 |---|---|---|---|
-| V1 répartition | écart < 20 % | **N = 2 : 10 / 10 ; N = 4 : 5 / 5 / 5 / 5 ; écart 0 %**, aucun échec | `v1_20261024_140111.log`, `v1_20261024_155856.log`, `v1_20261024_161201.log` |
-| V2 panne app1 | requêtes perdues, durée dégradée | **0 perdue, 0 dégradée**, sur trois mesures : 81 (PORGO), 139 et 132 requêtes (THIOMBIANO) | `v2_20261023_163047.log`, `v2_20261024_142807.log`, `v2_20261024_145903.log` |
-| V3 charge N=2 / N=4 | req/s | **Débit utile (réponses 200/s) : 15,7 avec N = 2, 12,3 avec N = 4** ; ab annonce 26,5 et 26,2 req/s, mais 41 % puis 53 % des réponses sont des 503 : la base est le goulot | `v3_N2_20261024_151124.log`, `v3_N4_20261024_160100.log` |
-| V4 panne bdd1 | durée de la bascule | **503 JSON propre pendant la panne, 0 réponse brute sur 160 sondes ; promotion 3 s ; service rétabli 3 à 5 s après la bascule** ; bdd1 redevenue réplique en 25 s | `v4_20261024_161821.log`, `v4_20261024_161821_sonde.log` |
-| V5 reconstruction | durée totale | **1 778 s (29 min 38 s)** pour les 7 machines, E1 et E2 comprises ; aucune commande ensuite, 0 erreur, `/sante` et `/resultat` en 200 | `v5_20261024_164401.log`, `v5_20261024_164401_vagrant.log` |
-| V6 panne lb1 | temps de reprise VRRP | **Application finale : 1 requête perdue sur 124, interruption réelle 1,70 s** ; rejoué sur le poste de THIOMBIANO : 1/114 en 1,74 s. Application de test : 1/122 en 1,73 s, 1/130 en 1,68 s | `v6_20261023_163244.log`, `v6_20261024_182157.log`, `v6_20261023_104601.log`, `v6_20261023_104251.log` |
+| V1 répartition | écart inférieur à 20 % | 10 et 10 appels avec deux serveurs, 5, 5, 5 et 5 avec quatre serveurs : écart de 0 %, aucun échec | `v1_20261024_140111.log`, `v1_20261024_155856.log`, `v1_20261024_161201.log` |
+| V2 panne de app1 | requêtes perdues, durée de dégradation | aucune requête perdue ni ralentie, sur trois mesures de 81 (PORGO), 139 et 132 requêtes (THIOMBIANO) | `v2_20261023_163047.log`, `v2_20261024_142807.log`, `v2_20261024_145903.log` |
+| V3 montée en charge | requêtes par seconde | débit utile de 15,7 réponses 200 par seconde avec deux serveurs et de 12,3 avec quatre. ab annonce 26,5 et 26,2 requêtes par seconde, mais 41 % puis 53 % des réponses sont des 503 : la base limite le débit | `v3_N2_20261024_151124.log`, `v3_N4_20261024_160100.log` |
+| V4 panne de bdd1 | durée de la bascule | 503 en JSON pendant la panne et aucune réponse brute sur 160 sondes. Promotion en 3 s, service rétabli 3 à 5 s après la bascule, bdd1 redevenue réplique en 25 s | `v4_20261024_161821.log`, `v4_20261024_161821_sonde.log` |
+| V5 reconstruction | durée totale | 1 778 s (29 min 38 s) pour les 7 machines, extensions comprises, sans aucune commande ensuite et sans erreur | `v5_20261024_164401.log`, `v5_20261024_164401_vagrant.log` |
+| V6 panne de lb1 | temps de reprise VRRP | avec l'application finale, une requête perdue sur 124 et 1,70 s d'interruption. Sur le poste de THIOMBIANO, une sur 114 en 1,74 s | `v6_20261023_163244.log`, `v6_20261024_182157.log` |
 
 ### 6.1 V1 : répartition (THIOMBIANO)
 
-**Commande** : `bash tests/v1_repartition.sh` (20 appels successifs à `http://192.168.59.5/info`).
-Le serveur qui a répondu est lu dans l'en-tête `X-Serveur` posé par HAProxy. La liste des serveurs
-attendus vient de `plateforme.json` : un serveur qui ne répondrait jamais compterait pour 0 au lieu
-d'être oublié. **Écart** = (plus sollicité − moins sollicité) / part attendue (20 / N).
+La commande `bash tests/v1_repartition.sh` envoie vingt appels successifs à `http://192.168.59.5/info` et
+lit le nom du serveur dans l'en-tête `X-Serveur` ajouté par HAProxy. La liste des serveurs attendus vient de
+`plateforme.json`, si bien qu'un serveur qui ne répondrait jamais serait compté à zéro au lieu d'être
+oublié. L'écart correspond à la différence entre le serveur le plus sollicité et le moins sollicité,
+rapportée à la part attendue de chacun (20 divisé par N).
 
 | N | Répartition | Écart | Ordre observé |
 |---|---|---|---|
-| 2 | app1 10, app2 10 | **0 %** | alternance stricte app2, app1, app2… |
-| 4 | app1 5, app2 5, app3 5, app4 5 | **0 %** | cycle strict app1 → app2 → app3 → app4, répété 5 fois |
+| 2 | app1 : 10, app2 : 10 | 0 % | alternance stricte entre app2 et app1 |
+| 4 | app1 à app4 : 5 chacun | 0 % | cycle app1, app2, app3, app4, répété cinq fois |
 
-**Commentaire** : c'est le comportement attendu de `balance roundrobin` avec des appels successifs et
-des serveurs tous sains. L'écart nul ne prouverait rien sous charge concurrente ; il prouve ici que tous
-les serveurs déclarés reçoivent du trafic, y compris app3 et app4 ajoutés par `NB_APP=4` (R3). Capture
-**C5b** : page de statistiques HAProxy, 4 serveurs UP, 5 sessions chacun.
+C'est le comportement attendu de la répartition à tour de rôle, avec des appels successifs et des serveurs
+tous en bonne santé. Un écart nul ne prouverait pas grand-chose sous une charge simultanée, mais il montre
+ici que tous les serveurs déclarés reçoivent du trafic, y compris app3 et app4 ajoutés par `NB_APP=4` (R3).
 
-### 6.2 V2 : panne d'un serveur applicatif (KOBENDE, mesures PORGO et THIOMBIANO)
+### 6.2 V2 : panne d'un serveur applicatif (KOBENDE, mesures de PORGO et THIOMBIANO)
 
-**Commande** : `DUREE=60 bash tests/v2_panne_app.sh` (une requête toutes les 200 ms sur l'IP
-virtuelle, `vagrant halt app1` à t = 5 s).
+La commande `DUREE=60 bash tests/v2_panne_app.sh` envoie une requête toutes les 200 ms sur l'IP virtuelle
+et arrête app1 avec `vagrant halt` au bout de 5 secondes.
 
-| Mesure | Requêtes | Perdues | Dégradées (> 0,5 s) | app1 répond encore après l'ordre d'arrêt |
+| Mesure | Requêtes | Perdues | Ralenties (plus de 0,5 s) | app1 répond encore après l'ordre d'arrêt pendant |
 |---|---|---|---|---|
 | 23/10 (PORGO) | 81 | 0 | 0 | 13,1 s |
-| 24/10 14:28 | 139 | 0 | 0 | 13,2 s |
-| 24/10 14:59 | 132 | 0 | 0 | 9,6 s |
+| 24/10 à 14 h 28 | 139 | 0 | 0 | 13,2 s |
+| 24/10 à 14 h 59 | 132 | 0 | 0 | 9,6 s |
 
-**Commentaire** : la panne est invisible pour les utilisateurs, dans les trois mesures. `vagrant halt`
-éteint app1 proprement ; pendant ce temps elle sert encore. Dès qu'elle cesse de répondre, la sonde
-l'écarte et `retry-on` + `redispatch` rejouent sur app2 les requêtes déjà parties vers elle. Capture
-**C3** : app1 DOWN et ÉTEINTE, la courbe d'app2 prend tout le débit, aucune réponse 5xx.
+Dans les trois mesures, la panne passe inaperçue pour les utilisateurs. `vagrant halt` éteint app1
+proprement et elle continue de répondre pendant l'arrêt. Dès qu'elle cesse de répondre, la sonde l'écarte,
+et les requêtes déjà envoyées vers elle sont rejouées sur app2. Sur la capture C3, app1 apparaît hors
+service et éteinte, app2 prend tout le débit et aucune réponse 5xx n'apparaît.
 
-![C3 : V2 vu par Grafana. app1 est écartée (DOWN, ÉTEINTE), app2 reprend tout le débit, uniquement des réponses 2xx.](captures/C3_grafana_panne_app1.png){width=100%}
+![C3 : le scénario V2 vu dans Grafana. app1 est écartée et éteinte, app2 reprend tout le débit, et seules des réponses 2xx apparaissent.](captures/C3_grafana_panne_app1.png){width=100%}
 
-### 6.3 V3 : montée en charge, N = 2 puis N = 4 (THIOMBIANO)
+### 6.3 V3 : montée en charge avec deux puis quatre serveurs (THIOMBIANO)
 
-**Commande** : `bash tests/v3_montee_charge.sh`, qui exécute 3 tirs de
-`ab -l -n 2000 -c 50 http://192.168.59.5/resultat?matricule=BF000123` après un échauffement non
-compté, 10 s de pause entre deux tirs ; on retient le tir médian. Entre les deux séries : `NB_APP=4`
-dans `.env`, puis `vagrant up` (4 min 22 s, app3 et app4 créées, HAProxy et Prometheus reconfigurés
-seuls). `ab` compte les 503 dans son « Requests per second » : le script calcule donc aussi le
-**débit utile**, en réponses 200 par seconde.
+La commande `bash tests/v3_montee_charge.sh` exécute trois tirs de
+`ab -l -n 2000 -c 50 http://192.168.59.5/resultat?matricule=BF000123`, après un tir d'échauffement non
+compté et avec 10 secondes de pause entre deux tirs. Nous retenons le tir médian. Entre les deux séries,
+nous avons mis `NB_APP=4` dans `.env` et relancé `vagrant up`, qui a créé app3 et app4 et reconfiguré
+HAProxy et Prometheus en 4 min 22 s. Comme ab compte aussi les réponses 503 dans son nombre de requêtes par
+seconde, le script calcule également le débit utile, c'est-à-dire le nombre de réponses 200 par seconde.
 
-| Tir | N = 2 : req/s (ab) | N = 2 : réponses 200/s | N = 2 : non-2xx | N = 4 : req/s (ab) | N = 4 : réponses 200/s | N = 4 : non-2xx |
+| Tir | N = 2 : req/s (ab) | N = 2 : réponses 200/s | N = 2 : réponses non 2xx | N = 4 : req/s (ab) | N = 4 : réponses 200/s | N = 4 : réponses non 2xx |
 |---|---|---|---|---|---|---|
 | 1 | 25,91 | 14,78 | 43,0 % | 28,96 | 11,86 | 59,0 % |
 | 2 | 26,49 | 15,68 | 40,8 % | 30,32 | 13,23 | 56,4 % |
 | 3 | 37,35 | 17,42 | 53,4 % | 26,25 | 12,35 | 53,0 % |
-| **Médiane** | **26,5** | **15,7** | **40,8 %** | **26,2** | **12,3** | **53,0 %** |
+| Médiane | 26,5 | 15,7 | 40,8 % | 26,2 | 12,3 | 53,0 % |
 | Temps de réponse médian | 1,5 à 1,9 s | | | 1,7 à 1,8 s | | |
 
-**Le débit n'augmente pas avec N : le débit utile baisse de 22 %.** Ce n'est pas une erreur de mesure,
-c'est le résultat, et il s'explique :
+Le débit n'augmente pas quand on passe à quatre serveurs : le débit utile baisse même de 22 %. Plusieurs
+éléments l'expliquent. D'abord, c'est la base qui limite, pas les serveurs applicatifs : pendant chaque tir,
+bdd1, qui n'a qu'un processeur virtuel, est à 100 % d'utilisation, alors que les serveurs applicatifs restent
+entre 50 et 90 % (captures C4 et C5). Ensuite, chaque requête ouvre une nouvelle connexion PostgreSQL,
+puisque nous avons choisi une application sans état et sans réserve de connexions (section 3.2). Chaque
+connexion lance un nouveau processus sur le serveur et une authentification SCRAM-SHA-256 de 4 096
+itérations, ce qui coûte bien plus cher que la lecture d'une ligne par sa clé primaire. Avec 50 requêtes
+simultanées, des connexions attendent plus de deux secondes et atteignent le `connect_timeout` :
+l'application renvoie alors un 503 au lieu de faire attendre l'utilisateur. Les journaux de PostgreSQL ne
+contiennent aucune erreur, ce sont donc bien des attentes qui expirent. Sous cette charge, `/sante` dépasse
+parfois lui aussi son délai, si bien que HAProxy écarte puis réintègre des serveurs quelques secondes plus
+tard : après la série à deux serveurs, les compteurs indiquaient 16 exclusions pour app1 (dont deux dues aux
+arrêts volontaires de V2) et 6 pour app2. Enfin, avec quatre serveurs, deux fois plus de connexions
+simultanées arrivent sur la même base saturée, et neuf machines virtuelles se partagent les quatre cœurs du
+même ordinateur.
 
-1. **Le goulot est la base, pas les serveurs applicatifs.** Pendant chaque tir, bdd1 (1 vCPU) est à
-   **100 %** de CPU, alors que les serveurs applicatifs restent entre 50 et 90 % (captures **C4** et **C5**).
-2. **Chaque requête ouvre une connexion PostgreSQL neuve** (choix « sans état, sans pool », § 3.2) :
-   nouveau processus serveur et authentification SCRAM-SHA-256 (4 096 itérations de hachage), à chaque
-   fois. Une connexion coûte bien plus cher que la requête `SELECT` par clé primaire elle-même.
-3. Avec 50 requêtes simultanées, les connexions attendent plus de **2 s** (`connect_timeout`) :
-   l'application renvoie alors un **503 propre** au lieu de faire attendre indéfiniment. Les journaux de
-   PostgreSQL ne contiennent aucune erreur : ce sont bien des attentes qui expirent.
-4. Même `/sante` dépasse son délai sous charge : HAProxy écarte puis réintègre les serveurs trois secondes
-   plus tard (journal de HAProxy ; compteurs relevés après la série N = 2 : app1 écartée 16 fois, dont
-   2 par les arrêts volontaires de V2, app2 6 fois).
-5. **Avec N = 4, c'est pire** : deux fois plus de serveurs ouvrent des connexions concurrentes vers la même
-   base saturée, et 9 machines virtuelles se partagent les 4 cœurs du même ordinateur.
+![C5 : le scénario V3 avec quatre serveurs. On voit les trois tirs, les quatre serveurs au même débit, bdd1 à 100 % de processeur (courbe rouge) et les réponses 5xx qui accompagnent chaque tir.](captures/C5_grafana_charge_N4.png){width=100%}
 
-![C5 : V3 avec N = 4. Les trois tirs, quatre serveurs à débit égal, bdd1 à 100 % de CPU (courbe rouge) et les réponses 5xx (rouge) qui accompagnent chaque tir.](captures/C5_grafana_charge_N4.png){width=100%}
+La plateforme garde malgré tout un comportement correct sous cette charge : aucune requête ne reste sans
+réponse (ab indique 0 requête en échec sur 12 000) et aucune page d'erreur brute n'est renvoyée. Le service
+se dégrade progressivement au lieu de s'effondrer. Pour que l'ajout de serveurs augmente vraiment le débit,
+il faudrait une réserve de connexions comme PgBouncer, afin que la base ne paie plus une authentification par
+requête, puis répartir les lectures sur la réplique bdd2 et installer les machines sur plusieurs hôtes
+(section 7).
 
-**Ce que la plateforme fait bien malgré tout** : aucune requête sans réponse (`Failed requests: 0` sur
-12 000), aucune page d'erreur brute ; elle **dégrade proprement** au lieu de s'effondrer.
-**Ce qu'il faudrait pour que N fasse monter le débit** (voir § 7) : un pool de connexions (PgBouncer)
-pour que la base ne paie plus une authentification par requête, puis des lectures réparties sur la
-réplique bdd2, et des machines virtuelles réparties sur plusieurs hôtes.
+### 6.4 V4 : panne de la base primaire et bascule (OUEDRAOGO, mesure de THIOMBIANO)
 
-### 6.4 V4 : panne de la base primaire et bascule (OUEDRAOGO, mesure THIOMBIANO)
+La commande `bash tests/v4_panne_bdd.sh` interroge `/sante` sur l'IP virtuelle toutes les 500 ms pendant
+tout le scénario. Elle arrête bdd1 avec `vagrant halt`, lance la bascule sur bdd2, attend le retour à 200,
+puis remet bdd1 en service avec `vagrant up bdd1`. Les instants sont comptés à partir de l'ordre d'arrêt.
 
-**Commande** : `bash tests/v4_panne_bdd.sh`. Une sonde interroge `/sante` sur l'IP virtuelle toutes les
-500 ms pendant tout le scénario ; le script exécute `vagrant halt bdd1`, puis
-`vagrant ssh bdd2 -c "sudo bash /vagrant/scripts/bascule_bdd.sh"`, attend le retour à 200, puis
-`vagrant up bdd1`.
-
-| Étape (t = ordre `vagrant halt bdd1`) | Résultat |
+| Étape | Résultat |
 |---|---|
-| Avant | bdd1 primaire (`pg_is_in_recovery = f`), bdd2 réplique (`t`), `/sante` 200 |
-| t = 18,1 s : premier 503 | PostgreSQL s'arrête au début de l'extinction de la VM |
-| Pendant la panne | `/sante` et `/resultat` : `{"erreur": "aucun serveur applicatif disponible"}` **[503]**, en JSON |
-| t = 78,7 s | VM bdd1 éteinte (arrêt propre de la VM : 78 s) |
-| Bascule | `bascule_bdd.sh` : **promotion en 3 s** ; commande complète 12 s, session `vagrant ssh` comprise |
-| Retour du service | **3,2 s** (sonde) à **5,0 s** (boucle d'attente) après la fin de la bascule, sans redémarrer l'application |
-| Sondes | 160 : 30 × 200, 130 × 503, **0 réponse sans code HTTP** (ni page blanche, ni connexion refusée) |
-| Interruption vue des utilisateurs | **79,1 s** (premier 503 → retour à 200) |
-| Remise en service : `vagrant up bdd1` | 129 s ; « ancien primaire détecté (ligne de temps 1 < 2) : conversion en réplique », réplique **en 25 s** |
-| Après | bdd1 réplique (`t`), bdd2 primaire (`f`), `/sante` 200 |
+| Avant | bdd1 primaire, bdd2 réplique, `/sante` répond 200 |
+| 18,1 s : premier 503 | PostgreSQL s'arrête au début de l'extinction de la machine |
+| Pendant la panne | `/sante` et `/resultat` répondent `{"erreur": "aucun serveur applicatif disponible"}` avec le code 503, en JSON |
+| 78,7 s | la machine bdd1 est éteinte (l'arrêt propre a duré 78 s) |
+| Bascule | promotion en 3 s, commande complète de 12 s avec l'ouverture de la session `vagrant ssh` |
+| Retour du service | 3,2 s (d'après la sonde) à 5,0 s (d'après la boucle d'attente) après la fin de la bascule, sans redémarrer l'application |
+| Sondes | 160 au total : 30 réponses 200, 130 réponses 503 et aucune réponse sans code HTTP |
+| Interruption vue par les utilisateurs | 79,1 s entre le premier 503 et le retour à 200 |
+| Remise en service avec `vagrant up bdd1` | 129 s, dont 25 s de conversion en réplique après la détection de l'ancien primaire (ligne de temps 1 contre 2) |
+| Après | bdd1 réplique, bdd2 primaire, `/sante` répond 200 |
 
-**Commentaire honnête.** L'exigence est satisfaite : le service renvoie proprement 503 pendant la panne,
-jamais une erreur brute, et la procédure de bascule est exécutable et chronométrée. Mais les **79 s**
-d'interruption sont dominées par la façon de provoquer la panne : le script attend que `vagrant halt`
-ait fini d'éteindre la VM (60 s après l'arrêt de PostgreSQL) avant de lancer la bascule, qui refuse de
-promouvoir bdd2 tant que l'ancien primaire répond. La procédure elle-même coûte 12 s de commande et 3 à
-5 s de réintégration par HAProxy. Une bascule lancée dès le premier 503 aurait donc réduit l'interruption
-à une vingtaine de secondes **plus le temps de réaction d'un humain** : c'est une estimation, pas une
-mesure. Pour la supprimer, il faut une bascule automatique (§ 7). Captures **C6** (terminal) et **C6b**
-(Grafana : bloc rouge de bdd1 dans l'historique, réponses 5xx pendant la panne).
+L'exigence est respectée : le service renvoie un 503 propre pendant la panne, jamais une erreur brute, et la
+procédure de bascule est exécutable et chronométrée. Il faut toutefois lire les 79 secondes d'interruption
+avec prudence, car elles viennent surtout de la façon dont nous provoquons la panne. Le script attend que
+`vagrant halt` ait fini d'éteindre la machine, soit 60 secondes après l'arrêt de PostgreSQL, avant de lancer
+la bascule, qui refuse de promouvoir bdd2 tant que l'ancien primaire répond. La procédure elle-même coûte
+12 secondes de commande, puis 3 à 5 secondes pour que HAProxy réintègre les serveurs. Une bascule lancée dès
+le premier 503 aurait donc ramené l'interruption à une vingtaine de secondes, plus le temps de réaction d'un
+opérateur. Il s'agit là d'une estimation et non d'une mesure. Pour supprimer cette attente, il faudrait une
+bascule automatique (section 7).
 
-![C6b : historique de disponibilité. Le bloc rouge de bdd1 (vers 16:19-16:22) est la panne V4 ; app3 et app4 disparaissent au retour à N = 2.](captures/C6b_grafana_panne_bdd1.png){width=100%}
+![C6b : historique de disponibilité. Le bloc rouge de bdd1, entre 16 h 19 et 16 h 22, correspond à la panne V4. app3 et app4 disparaissent au retour à deux serveurs.](captures/C6b_grafana_panne_bdd1.png){width=100%}
 
-### 6.5 V5 : reconstruction intégrale (THIOMBIANO)
+### 6.5 V5 : reconstruction complète (THIOMBIANO)
 
-**Commande** : `bash tests/v5_reconstruction.sh`, qui exécute `vagrant destroy -f` puis `vagrant up`
-sans aucune intervention, puis vérifie la plateforme. Paramètres : `GROUPE=4 NB_APP=2 E1_LB2=1 E2_OBS=1`
-(7 machines), box déjà en cache.
+La commande `bash tests/v5_reconstruction.sh` exécute `vagrant destroy -f` puis `vagrant up` sans aucune
+intervention, et vérifie ensuite la plateforme. Les paramètres étaient `GROUPE=4`, `NB_APP=2`, `E1_LB2=1`
+et `E2_OBS=1` (7 machines), avec la box déjà présente sur le poste.
 
 | Phase | Durée |
 |---|---|
-| `vagrant destroy -f` (7 machines) | 36 s |
-| `vagrant up` (bases, réplication, application, lb1 + lb2, obs) | 1 742 s, code de retour 0 |
-| **Total** | **1 778 s (29 min 38 s)** |
-| Vérification | 7 machines en marche ; `/sante` 200 ; `/resultat?matricule=BF000123` 200 ; 0 erreur dans le journal Vagrant |
+| `vagrant destroy -f` sur les 7 machines | 36 s |
+| `vagrant up` (bases, réplication, application, lb1, lb2, obs) | 1 742 s, sans erreur |
+| Total | 1 778 s, soit 29 min 38 s |
+| Vérification | 7 machines en marche, `/sante` et `/resultat?matricule=BF000123` répondent 200, aucune erreur dans le journal de Vagrant |
 
-**Commentaire** : R1 est satisfaite sur la plateforme complète, extensions comprises, sur un deuxième
-poste que celui où elle a été développée. La supervision s'installe du premier coup, ce qui valide la
-correction de Grafana (§ 3.5) sur une machine neuve. La durée vient pour l'essentiel des téléchargements
-apt (PostgreSQL, HAProxy, Grafana ≈ 150 Mo) et du démarrage séquentiel des machines : à comparer aux
-1 934 s mesurées sur le poste de PORGO sans obs (même ordre de grandeur), et aux 1 560 s du premier
-`vagrant up` sur ce poste, sans obs mais avec le téléchargement de la box.
+R1 est donc respectée sur la plateforme complète, extensions comprises, et sur un autre poste que celui où
+elle a été développée. La durée vient surtout des téléchargements apt (PostgreSQL, HAProxy, Grafana) et du
+démarrage des machines les unes après les autres. Elle reste du même ordre que les 1 934 s mesurées sur le
+poste de PORGO sans obs. Le 25 octobre, une dernière reconstruction complète des 7 machines sur le poste de
+PORGO, avec la version finale du code et Grafana installé depuis son cache, a également abouti sans erreur.
 
 ### 6.6 V6 : panne du répartiteur (PORGO)
 
-Commande V6 : `DUREE=45 bash tests/v6_panne_lb.sh` (une requête vers `http://192.168.59.5/info` toutes les
-200 ms, `vagrant halt lb1` à t = 5 s). **Commentaire** : `vagrant halt` éteint lb1 proprement en une dizaine de
-secondes, pendant lesquelles il sert encore ; la seule requête perdue tombe dans l'instant où keepalived
-s'arrête sur lb1 et où lb2 n'a pas encore pris l'IP. L'interruption mesurée (≈ 1,7 s) est inférieure aux 5 s
-exigées, et cohérente avec `advert_int 1` (lb2 n'attend pas l'expiration des annonces : keepalived envoie
-une annonce de priorité 0 en s'arrêtant). Une coupure brutale (arrêt électrique) attendrait au contraire
-l'expiration des annonces (3 × `advert_int` + décalage ≈ 3 à 4 s), ce qui reste sous les 5 s.
+La commande `DUREE=45 bash tests/v6_panne_lb.sh` envoie une requête toutes les 200 ms vers
+`http://192.168.59.5/info` et arrête lb1 avec `vagrant halt` au bout de 5 secondes. `vagrant halt` éteint lb1
+proprement en une dizaine de secondes, pendant lesquelles il continue de servir. La seule requête perdue
+tombe au moment où keepalived s'arrête sur lb1 et où lb2 n'a pas encore pris l'adresse. L'interruption
+mesurée, de 1,7 s environ, reste sous les 5 secondes demandées. Elle s'explique par le fait que keepalived,
+en s'arrêtant, envoie une annonce de priorité nulle : lb2 n'a donc pas besoin d'attendre l'expiration des
+annonces. En cas de coupure brutale, comme une panne de courant, lb2 attendrait environ trois à quatre
+secondes, ce qui resterait sous la limite.
 
-**Vérifications du domaine réseau et répartition** (`bash tests/verifier_repartition.sh r2|r3|r4|r8`) :
+Nous avons aussi vérifié les exigences de répartition avec `bash tests/verifier_repartition.sh` :
 
-| Exigence | Méthode | Résultat | Fichier brut |
+| Exigence | Méthode | Résultat | Fichier |
 |---|---|---|---|
-| R1 | `vagrant destroy -f && vagrant up`, plateforme complète (bases, application, répartiteurs), sans aucune commande ensuite | succès, **1 934 s** (box déjà en cache) ; 1er `vagrant up` du socle seul : 1 433 s téléchargement de la box inclus | — (journal de la console) |
-| R1, 2e poste | Clone neuf sur le poste de THIOMBIANO, `vagrant up` (bases, application, lb1 + lb2), sans aucune commande ensuite | succès, **1 560 s** (25 min 59 s), téléchargement de la box inclus | `r1_poste_thiombiano_20261024_111253.log` |
-| R3, 2 → 4 → 2 | `NB_APP=4` dans `.env`, `vagrant up` ; puis `vagrant destroy -f app3 app4`, `NB_APP=2`, `vagrant up` | **4 min 22 s** ; « HAProxy reconfiguré : 4 serveur(s) » sur lb1 et lb2, « Prometheus reconfiguré : 9 machine(s) » ; retour : 2 serveurs et 7 machines | `r3_nb_app4_20261024_152310.log` |
-| R2 | `vagrant provision` ×2 sur les 6 VM, empreintes SHA-256 des fichiers de configuration (socle, HAProxy, keepalived, application, PostgreSQL) **et PID des services** | **6/6 identiques** sur la plateforme complète | `repartition_20261023_162550.log` (socle seul : `repartition_20261023_105608.log`) |
-| R3 | `NB_APP=4` puis stats HAProxy et 20 appels à `/info` | 4 serveurs UP, **5/5/5/5** ; retour à 2 exécuté | `repartition_20261023_110244.log` |
-| R4 | arrêt du service de app1, scrutation des stats toutes les 200 ms | application finale : **1 394 ms**, puis **1 279 ms** après le passage à `timeout check 3s` (application de test : 1 037 ms) ; exigence < 5 000 ms | `repartition_20261023_162950.log`, `repartition_20261023_165028.log`, `repartition_20261023_104215.log` |
-| R5 | `bash tests/verifier_replication.sh` (OUEDRAOGO) : insertion d'une ligne datée sur bdd1, lecture sur bdd2, suppression | ligne lue sur bdd2 **dès la 1re lecture (≤ 1 s)**, sur le poste d'OUEDRAOGO puis sur celui de PORGO ; ligne de test supprimée | `r5_replication_20261025.log`, `r5_replication_20261025_141141_poste_porgo.log` |
-| R8 | `vagrant port` sur chaque VM | seul lb1 : 80 → 8080 ; ailleurs SSH Vagrant uniquement | `repartition_20261023_104842.log` |
-| V1 (préliminaire) | 20 appels à `/info` sur l'IP virtuelle, N = 2 | **10/10**, écart 0 %, avec l'application de test puis avec l'application finale (alternance stricte app1/app2) | — (mesure officielle : THIOMBIANO, `v1_repartition.sh`) |
+| R1 | `vagrant destroy -f && vagrant up` de la plateforme sans obs, sans commande ensuite | réussite en 1 934 s, box déjà présente. Le premier `vagrant up` du socle avait pris 1 433 s avec le téléchargement de la box | journal de la console |
+| R1 sur un deuxième poste | clone neuf sur le poste de THIOMBIANO, puis `vagrant up` | réussite en 1 560 s, téléchargement de la box compris | `r1_poste_thiombiano_20261024_111253.log` |
+| R2 | deux `vagrant provision` successifs sur les 6 machines, avec comparaison des empreintes des fichiers de configuration et des numéros de processus des services | aucune différence sur les 6 machines | `repartition_20261023_162550.log` |
+| R3 | passage de 2 à 4 serveurs puis retour à 2 | 4 min 22 s. HAProxy est reconfiguré avec 4 serveurs sur lb1 et lb2, Prometheus avec 9 machines, puis tout revient à 2 serveurs et 7 machines. Les 20 appels se répartissent 5, 5, 5 et 5 | `r3_nb_app4_20261024_152310.log`, `repartition_20261023_110244.log` |
+| R4 | arrêt du service sur app1 et lecture des statistiques toutes les 200 ms | app1 écartée en 1 394 ms, puis en 1 279 ms avec le délai de lecture de 3 s, pour une exigence de 5 000 ms | `repartition_20261023_162950.log`, `repartition_20261023_165028.log` |
+| R5 | `bash tests/verifier_replication.sh` (OUEDRAOGO) : insertion d'une ligne datée sur bdd1, lecture sur bdd2, puis suppression | la ligne est lisible sur bdd2 dès la première lecture, en une seconde au plus, sur le poste d'OUEDRAOGO comme sur celui de PORGO | `r5_replication_20261025.log`, `r5_replication_20261025_141141_poste_porgo.log` |
+| R8 | `vagrant port` sur chaque machine | seul lb1 redirige un port (80 vers 8080), les autres n'ont que l'accès SSH de Vagrant | `repartition_20261023_104842.log` |
 
-Les premières mesures (matin du 23/10) ont été faites avec une **application de test temporaire** (15 lignes,
-répond 200 sur toutes les routes) ; R1, R2, R4, V2 et V6 ont été **refaites l'après-midi avec l'application
-finale et la base répliquée** : ce sont les chiffres de référence. L'application finale a aussi été vérifiée
-sur tous ses cas de réponse via l'IP virtuelle : 200 (matricule existant, dont `BF050000`), 400 (paramètre
-absent), 404 (matricule ou route inconnus) ; une tentative d'injection SQL (`BF000001' OR 1=1--`) renvoie 404.
+Les premières mesures, le matin du 23 octobre, ont été faites avec une petite application de test qui
+répondait 200 sur toutes les routes. Nous avons refait R1, R2, R4, V2 et V6 l'après-midi avec l'application
+finale et la base répliquée : ce sont ces chiffres qui figurent ci-dessus. Nous avons aussi vérifié les
+réponses de l'application finale à travers l'IP virtuelle : 200 pour un matricule existant (y compris
+`BF050000`), 400 sans paramètre, 404 pour un matricule ou une route inconnus. Une tentative d'injection
+SQL (`BF000001' OR 1=1--`) renvoie simplement 404.
 
-Poste de mesure : Intel Core i7-1165G7 (4 cœurs, 8 threads), 15,7 Go de RAM, Windows 11 Professionnel,
-VirtualBox 7.2.6, Vagrant 2.4.9 ; VM Ubuntu 24.04.3 LTS (noyau 6.8), HAProxy 2.8.30, keepalived 2.2.8.
+Le poste de PORGO est équipé d'un processeur Intel Core i7-1165G7 (4 cœurs, 8 threads) et de 15,7 Go de RAM,
+sous Windows 11 Professionnel, avec VirtualBox 7.2.6 et Vagrant 2.4.9. Les machines virtuelles tournent sous
+Ubuntu 24.04.3 LTS (noyau 6.8), avec HAProxy 2.8.30 et keepalived 2.2.8.
 
-## 7. Limites connues et ce que nous ferions autrement (tous)
+## 7. Limites connues et ce que nous ferions autrement (groupe)
 
 | Limite | Conséquence | Ce que nous ferions autrement |
 |---|---|---|
-| Toutes les VM partagent le processeur d'un seul ordinateur | Ajouter des serveurs ne multiplie pas le débit (V3) : les mesures de charge mesurent surtout le partage du CPU | Répartir les VM sur plusieurs hôtes, ou mesurer dans un vrai cloud |
-| **La base primaire est le goulot** (1 vCPU, une connexion authentifiée par requête) | V3 : bdd1 à 100 % de CPU ; avec 50 clients simultanés, 41 % (N = 2) puis 53 % (N = 4) de 503 ; le débit utile **baisse** de 15,7 à 12,3 réponses/s quand on double N | PgBouncer (pool de connexions) devant la base ; lectures réparties sur la réplique ; plus de vCPU pour la base |
-| Bascule de la base **manuelle** | Le service reste en 503 jusqu'à ce qu'un humain lance `bascule_bdd.sh` | Bascule automatique avec Patroni + etcd (consensus, pas de double primaire) |
-| Réplication **asynchrone** | Perte possible des dernières transactions (RPO > 0) si l'application écrivait | Réplication synchrone (`synchronous_standby_names`) avec une 3e base pour ne pas bloquer les écritures |
-| Fenêtre de **42,7 s** au retour de l'ancien primaire (§ 5.3) | Lectures possiblement périmées pendant cette fenêtre | Condition `ExecStartPre` sur PostgreSQL, ou Patroni |
-| Serveur applicatif **gelé** écarté en ≈ 7 s (`timeout check 3s`, § 3.1) | Au-delà des 5 s pour ce cas précis (les pannes franches restent à ≈ 1,3 s) | Une sonde `/sante` plus rapide, qui n'essaie que les bases joignables |
-| La box `bento/ubuntu-24.04` est amd64 | Impossible de faire tourner la plateforme sur un Mac à processeur ARM (cas d'un membre du groupe) | Prévoir une box arm64 et un fournisseur adapté (ex. VMware Fusion, Parallels) |
-| Une connexion à la base par requête | Coût de connexion (processus + SCRAM) à chaque requête : négligeable à faible trafic, **dominant sous charge** (V3) | Petit pool de connexions qui se reconnecte, ou PgBouncer |
-| Interruption de V4 dominée par l'attente de l'extinction de bdd1 | 79 s mesurées, dont environ 60 s d'arrêt de la VM avant la bascule | Bascule automatique (Patroni) déclenchée par la perte du primaire |
-| Grafana 13 lourd pour 768 Mo | Premier démarrage de 10 min avant correction (§ 3.5) ; obs utilise encore ≈ 530 Mo sur 709 | Version de Grafana épinglée, ou 1 Go pour obs |
+| Toutes les machines virtuelles partagent le processeur d'un seul ordinateur | Ajouter des serveurs ne multiplie pas le débit (V3) : les tests de charge mesurent surtout ce partage | Répartir les machines sur plusieurs hôtes, ou mesurer dans un vrai cloud |
+| La base primaire limite le débit (un processeur virtuel, une connexion authentifiée par requête) | Pendant V3, bdd1 est à 100 % et, avec 50 clients simultanés, 41 % puis 53 % des réponses sont des 503. Le débit utile baisse de 15,7 à 12,3 réponses par seconde quand on double le nombre de serveurs | Placer PgBouncer devant la base, répartir les lectures sur la réplique et donner plus de processeurs à la base |
+| La bascule de la base est manuelle | Le service reste en 503 jusqu'à ce que quelqu'un lance `bascule_bdd.sh` | Automatiser la bascule avec Patroni et etcd, qui évitent aussi d'avoir deux primaires |
+| La réplication est asynchrone | Les dernières transactions pourraient être perdues si l'application écrivait | Passer en réplication synchrone, avec une troisième base pour ne pas bloquer les écritures |
+| bdd1 reste primaire pendant 42,7 s quand elle revient après une bascule (section 5.3) | Des lectures périmées sont possibles pendant ce temps | Une condition `ExecStartPre` sur PostgreSQL, ou Patroni |
+| Un serveur applicatif figé n'est écarté qu'au bout de 7 s environ (section 3.1) | Cela dépasse les 5 s pour ce cas précis, alors que les pannes franches restent autour de 1,3 s | Une sonde `/sante` plus rapide, qui n'essaie que les bases joignables |
+| La box `bento/ubuntu-24.04` est prévue pour les processeurs Intel et AMD | La plateforme ne tourne pas sur un Mac à processeur ARM, ce qui était le cas d'un membre du groupe | Prévoir une box arm64 et un hyperviseur adapté, comme VMware Fusion ou Parallels |
+| L'interruption de V4 dépend surtout de l'extinction de bdd1 | 79 s mesurées, dont 60 s d'arrêt de la machine avant la bascule | Une bascule automatique déclenchée dès la perte du primaire |
+| Grafana 13 est lourd pour 768 Mo de mémoire | Premier démarrage de 10 minutes avant correction (section 3.5), et 530 Mo utilisés sur 709 | Donner 1 Go à obs, ou choisir un outil de visualisation plus léger |
 
 ## 8. Annexes
 
-### 8.1 Arborescence du dépôt
+### 8.1 Organisation du dépôt
 
 ```
-Vagrantfile                  table NOEUDS = source unique de vérité
+Vagrantfile                  table NOEUDS, source unique de vérité
 .env.exemple                 modèle de configuration (le .env n'est jamais versionné)
 app/app.py                   service HTTP sans état (87 lignes)
 scripts/lib.sh               fonctions communes (apt groupé, idempotence, attente)
 scripts/plateforme.py        lecture de config/plateforme.json
-scripts/commun.sh            socle de toutes les machines
-scripts/lb.sh                HAProxy + keepalived
-scripts/generer_config_lb.py haproxy.cfg et keepalived.conf engendrés
+scripts/commun.sh            socle installé sur toutes les machines
+scripts/lb.sh                HAProxy et keepalived
+scripts/generer_config_lb.py génération de haproxy.cfg et keepalived.conf
 scripts/app.sh               déploiement du service applicatif
 scripts/bdd.sh               PostgreSQL primaire et jeu de données
 scripts/replique.sh          réplique en flux
 scripts/bascule_bdd.sh       promotion chronométrée
 scripts/reintegrer_bdd.sh    remise en service de l'ancien primaire
-scripts/obs.sh               Prometheus + Grafana (E2), cibles engendrées
-config/grafana/              source de données et tableau de bord provisionnés
-tests/v1 … v6_*.sh           scénarios V1 à V6 ; verifier_repartition.sh (R2, R3, R4, R8)
-tests/resultats/             résultats bruts horodatés (preuves des chiffres du § 6)
-docs/captures/               captures C1 à C6b citées au § 6
-docs/                        plan de travail, installation, dossier, journal
+scripts/obs.sh               Prometheus et Grafana (E2)
+config/grafana/              source de données et tableau de bord
+tests/                       scénarios V1 à V6 et vérifications R2 à R8
+tests/resultats/             résultats bruts horodatés cités dans ce dossier
+docs/captures/               captures citées en section 6
+docs/                        installation, plan de travail, démonstration, dossier et journal
 ```
 
-### 8.2 Extrait de la configuration HAProxy engendrée (N = 2)
+### 8.2 Extrait de la configuration HAProxy générée avec deux serveurs
 
 ```
 defaults
@@ -562,4 +567,5 @@ backend serveurs_applicatifs
     server app2 192.168.59.22:3000 check
 ```
 
-Avec `NB_APP=4`, les lignes `server app3 …` et `server app4 …` apparaissent seules, sans autre modification.
+Avec `NB_APP=4`, deux lignes `server app3` et `server app4` s'ajoutent automatiquement, sans autre
+modification.
