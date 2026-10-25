@@ -21,23 +21,40 @@ source /vagrant/scripts/lib.sh
 
 MON_IP=$(plateforme ip "$(hostname -s)")
 
-# --- Dépôt apt de Grafana (absent d'Ubuntu) ----------------------------------
-# Clé au format texte (.asc), qu'apt lit directement : gpg n'est pas nécessaire.
-CLE=/etc/apt/keyrings/grafana.asc
-if [ ! -s "$CLE" ]; then
-  tmp=$(mktemp)
-  curl -fsSL https://apt.grafana.com/gpg.key -o "$tmp"
-  install -D -m 644 "$tmp" "$CLE"
-  rm -f "$tmp"
-fi
-tmp=$(mktemp)
-echo "deb [signed-by=${CLE}] https://apt.grafana.com stable main" > "$tmp"
-if installer_si_change "$tmp" /etc/apt/sources.list.d/grafana.list 644; then
-  # Nouveau dépôt : forcer le rafraîchissement de l'index (lib.sh ne le fait que toutes les 6 h).
-  rm -f /var/lib/resultats-bf/apt-update
-fi
+# --- Grafana (absent d'Ubuntu) : paquet .deb épinglé, vérifié et mis en cache --
+# Le dépôt apt.grafana.com est injoignable depuis certains réseaux (connexion
+# réinitialisée, constaté le 25/10 alors que dl.grafana.com répond) : un seul
+# incident réseau faisait échouer tout « vagrant up ». On télécharge donc le
+# paquet directement, une seule fois, dans /vagrant/.cache (dossier du projet,
+# ignoré par Git) : il survit à « vagrant destroy » et la reconstruction de la
+# démonstration ne dépend plus d'Internet pour Grafana. Version épinglée,
+# comme la box : même Grafana pour tout le groupe.
+GRAFANA_VERSION=13.2.4
+# Empreinte publiée sur dl.grafana.com (…deb.sha256) : vérification sans réseau.
+GRAFANA_SHA256=f32ba4e166e35a376f39cbeb8dd47c57f7bf608b09339cb41adf6d39082af3c5
+DEB="grafana_${GRAFANA_VERSION}_amd64.deb"
+URL="https://dl.grafana.com/oss/release/${DEB}"
+CACHE=/vagrant/.cache
+rm -f /etc/apt/sources.list.d/grafana.list    # ancien dépôt apt, s'il existe
 
-installer_paquets prometheus grafana
+installer_paquets prometheus
+
+if ! dpkg-query -W -f='${Version}' grafana 2>/dev/null | grep -q "^${GRAFANA_VERSION}"; then
+  mkdir -p "$CACHE"
+  attendu=$GRAFANA_SHA256
+  if [ ! -f "$CACHE/$DEB" ] || [ "$(sha256sum "$CACHE/$DEB" | awk '{print $1}')" != "$attendu" ]; then
+    journal "téléchargement de Grafana ${GRAFANA_VERSION} (≈ 380 Mo, une seule fois)"
+    curl -fL --retry 5 --retry-delay 3 --retry-all-errors -sS -o "$CACHE/$DEB.partiel" "$URL"
+    mv "$CACHE/$DEB.partiel" "$CACHE/$DEB"
+  fi
+  if [ "$(sha256sum "$CACHE/$DEB" | awk '{print $1}')" != "$attendu" ]; then
+    journal "ÉCHEC : empreinte SHA-256 du paquet Grafana incorrecte"
+    exit 1
+  fi
+  # apt résout les dépendances du paquet local (index rafraîchi par installer_paquets).
+  apt-get -o DPkg::Lock::Timeout=300 install -y -qq --no-install-recommends "$CACHE/$DEB"
+  journal "Grafana ${GRAFANA_VERSION} installé"
+fi
 
 # --- Prometheus : configuration engendrée ------------------------------------
 tmp=$(mktemp)
