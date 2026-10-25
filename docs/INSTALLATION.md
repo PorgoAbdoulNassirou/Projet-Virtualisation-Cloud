@@ -31,7 +31,6 @@ Ouvrir **PowerShell en administrateur** (clic droit → « Exécuter en tant qu'
 winget install --id Oracle.VirtualBox     -e --version 7.2.6  --accept-package-agreements --accept-source-agreements
 winget install --id Hashicorp.Vagrant     -e --version 2.4.9  --accept-package-agreements --accept-source-agreements
 winget install --id Git.Git               -e                  --accept-package-agreements --accept-source-agreements
-winget install --id Anthropic.ClaudeCode  -e                  --accept-package-agreements --accept-source-agreements
 ```
 
 | Outil | Version | Rôle dans le projet |
@@ -39,7 +38,6 @@ winget install --id Anthropic.ClaudeCode  -e                  --accept-package-a
 | Oracle VirtualBox | **7.2.6** | Hyperviseur de type 2 qui exécute les VM |
 | HashiCorp Vagrant | **2.4.9** | Crée et provisionne les VM à partir du `Vagrantfile` |
 | Git (avec **Git Bash**) | dernière | Dépôt partagé ; Git Bash fournit `bash`, `curl`, `sed`, `awk` pour les scripts de `tests/` |
-| Claude Code | dernière | Assistant utilisé avec les prompts de `SUIVI_ET_PROMPTS.md` |
 
 **Redémarrer l'ordinateur** après l'installation de VirtualBox et de Vagrant (pilotes réseau et `PATH`).
 
@@ -51,7 +49,6 @@ Dans **Git Bash** :
 vagrant --version                                         # Vagrant 2.4.9
 "/c/Program Files/Oracle/VirtualBox/VBoxManage.exe" --version   # 7.2.6r…
 git --version
-claude --version
 ```
 
 ### Configuration de Git (une seule fois)
