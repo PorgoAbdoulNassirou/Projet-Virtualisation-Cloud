@@ -116,7 +116,7 @@ Personne ne l'installe à la main : c'est le provisionnement qui le fait, à cha
 | lb1, lb2 | `haproxy` 2.8, `keepalived` 2.2 | `scripts/lb.sh` |
 | app1 … appN | `python3-psycopg2` | `scripts/app.sh` |
 | bdd1, bdd2 | `postgresql` 16 | `scripts/bdd.sh`, `scripts/replique.sh` |
-| obs | `prometheus`, `grafana` (dépôt apt.grafana.com) | `scripts/obs.sh` |
+| obs | `prometheus` ; `grafana` 13.2.4 (paquet `.deb` de dl.grafana.com, empreinte SHA-256 vérifiée, mis en cache dans `.cache/` du projet : téléchargé une seule fois, ≈ 380 Mo) | `scripts/obs.sh` |
 
 **Règle pour tout nouveau besoin** : un paquet nécessaire dans une VM s'ajoute dans le script du rôle,
 avec `installer_paquets` (un seul appel par script), et ce tableau est mis à jour. Un outil nécessaire sur

@@ -39,10 +39,10 @@ Le détail des tâches et des contrats est dans [docs/PLAN_DE_TRAVAIL.md](docs/P
 
 | Membre | Rôle | Reste à faire |
 |---|---|---|
-| **PORGO Abdoul Nassirou** | Architecte réseau et répartition | Inviter les membres comme collaborateurs ; relire et fusionner la branche de THIOMBIANO ; répétition de la démo |
-| **OUEDRAOGO Armand Hendrix** | Ingénieur données | ✅ partie fusionnée. Reste : **relire les sections 3.3 et 5.2 du dossier** (rédigées par PORGO à partir de ses scripts) ; **rotation** (commit hors domaine, voir § 5.1) |
-| **KOBENDE Pêgdwendé Evrard** | Ingénieur applicatif | ✅ partie fusionnée et testée. Reste : savoir expliquer l'ensemble en soutenance ; bonus E4 seulement si tout le reste est fini |
-| **THIOMBIANO Yempabou Romaric Johan** | Ingénieur essais et observabilité | ✅ le 24/10 : E2 (`obs.sh`, Grafana), V1, V3, V4, V5 mesurés, § 1, 3.5 et 6 du dossier, journal ; rotation node_exporter. Reste : **fusion des branches `feat/obs` et `feat/tests`**, assemblage final du rapport après relecture |
+| **PORGO Abdoul Nassirou** | Architecte réseau et répartition | ✅ branches de THIOMBIANO fusionnées, rapport et journal mis en forme pour le rendu (PDF), fiche de démonstration. Reste : **envoyer** (§ 7) et répéter la démo |
+| **OUEDRAOGO Armand Hendrix** | Ingénieur données | ✅ partie fusionnée. **URGENT avant l'envoi : commit hors de son domaine** (rotation obligatoire, l'historique Git fait foi) : voir le prompt § 5.1 |
+| **KOBENDE Pêgdwendé Evrard** | Ingénieur applicatif | ✅ partie fusionnée et testée. Reste : préparer la soutenance (`docs/DEMONSTRATION.md`) |
+| **THIOMBIANO Yempabou Romaric Johan** | Ingénieur essais et observabilité | ✅ E2, V1, V3, V4, V5, rapport assemblé ; branches fusionnées dans `main` le 25/10 |
 
 ---
 
@@ -121,26 +121,32 @@ ou d'une IA dans les commits ou les pull requests. Explique-moi chaque décision
 la défendre en soutenance.
 ```
 
-### 5.1 OUEDRAOGO Armand Hendrix (partie fusionnée ; reste : relecture et rotation)
+### 5.1 OUEDRAOGO Armand Hendrix (URGENT : commit de rotation avant l'envoi)
 
 ```text
 Tu travailles sur le dépôt RÉSULTATS-BF (projet Vagrant + VirtualBox, groupe 04, réseau
 192.168.59.0/24). Je suis OUEDRAOGO Armand Hendrix, ingénieur données. Ma partie (bdd.sh,
-replique.sh, bascule_bdd.sh) est fusionnée dans main. PORGO l'a complétée pendant l'intégration :
-reintegrer_bdd.sh (remise en service de bdd1 comme réplique après une bascule), garde-fous dans
-bdd.sh et replique.sh, bascule symétrique, et il a rédigé les sections 3.3 et 5.2 du dossier.
-Commence par `git pull`, puis lis SUIVI_ET_PROMPTS.md, docs/dossier_architecture.md (§ 3.3, 5.2,
-5.3), docs/journal_de_bord.md et mes trois scripts ainsi que scripts/reintegrer_bdd.sh.
+replique.sh, bascule_bdd.sh) est fusionnée, mais je n'ai encore AUCUN commit hors de mon domaine :
+l'énoncé rend la rotation obligatoire et l'historique Git fait foi. Commence par `git pull`, puis
+lis SUIVI_ET_PROMPTS.md, tests/README.md, tests/v6_panne_lb.sh et tests/v1_repartition.sh (modèles
+de scripts de scénario), scripts/bdd.sh, scripts/replique.sh, scripts/reintegrer_bdd.sh et
+docs/dossier_architecture.md (§ 3.3, 5.2, 5.3).
 
-1. Explique-moi en détail ces modifications et le mécanisme des lignes de temps (timeline) de
-   PostgreSQL, pour que je puisse les défendre en soutenance.
-2. Relis les sections 3.3 et 5.2 du dossier et corrige ce qui serait inexact.
-3. Rotation obligatoire (commit hors de mon domaine) : propose et réalise une amélioration utile
-   hors de mes scripts, par exemple relire app/app.py et commenter le choix
-   target_session_attrs=read-write, ou ajouter au dossier une entrée de journal.
-Contraintes : aucune adresse IP en dur, aucun secret, idempotence. Commits en français avec mon
-identité Git uniquement : n'ajoute JAMAIS de ligne Co-Authored-By ni aucune mention de Claude ou
-d'une IA dans les commits ou les pull requests. Branche feat/relecture-bdd, puis pull request vers main.
+Tâche (domaine des tests, hors du mien) : écrire tests/r5_replication.sh, lancé DEPUIS L'HÔTE (Git
+Bash) à la racine du dépôt, qui prouve l'exigence R5 :
+1. détecter quelle base est primaire et laquelle est réplique (pg_is_in_recovery() sur chacune,
+   par `vagrant ssh bddN -c "sudo -u postgres psql -tAc ..."`), sans rien supposer ;
+2. insérer une ligne de test datée sur le primaire, mesurer le délai jusqu'à ce qu'elle soit
+   lisible sur la réplique (scrutation toutes les 200 ms), puis la supprimer ;
+3. afficher et enregistrer le résultat brut dans tests/resultats/r5_<date>.log ;
+4. ajouter la ligne du script au tableau de tests/README.md, et la mesure au § 6 du dossier
+   (tableau « Vérifications ») ; ajouter dans docs/journal_de_bord.md, ligne « Rôles », la mention
+   « test R5 par OUEDRAOGO » dans la liste des commits hors domaine.
+Si je ne peux pas lancer les VM, écris et vérifie au moins la syntaxe (`bash -n`) et indique-le ;
+PORGO lancera la mesure. Contraintes : aucune adresse IP en dur (lire config/plateforme.json),
+aucun secret. Commits en français avec mon identité Git uniquement : n'ajoute JAMAIS de ligne
+Co-Authored-By ni aucune mention de Claude ou d'une IA dans les commits ou les pull requests.
+Pousse sur une branche feat/r5 et préviens PORGO pour la fusion.
 ```
 
 ### 5.2 KOBENDE Pêgdwendé Evrard (partie fusionnée et testée)
@@ -225,9 +231,9 @@ puisse la défendre en soutenance.
 - [x] **2** KOBENDE : `app.py` + `app.sh` fusionnés (V2 mesuré : 0 perdue / 81) — 23/10
 - [x] **2** OUEDRAOGO : `bascule_bdd.sh` fusionné (bascule mesurée : 2 s) — 23/10
 - [x] **2** PORGO : R2, R3, R4, R8 vérifiés ; V6 rejoué avec l'application finale (1,70 s)
-- [ ] **1** THIOMBIANO : E2 fusionnée (faite et poussée sur `feat/obs` le 24/10, pull request à fusionner)
+- [x] **1** THIOMBIANO : E2 fusionnée dans `main` le 25/10
 - [x] **3** THIOMBIANO : V1, V3, V4, V5 mesurés le 24/10 (branche `feat/tests`) ; § 1, 3.5 et 6 du dossier rédigés
-- [ ] **3** THIOMBIANO : dossier final assemblé et converti (après relecture du groupe)
+- [x] **3** THIOMBIANO / PORGO : dossier final assemblé, en-tête de rendu, converti en Word et PDF (15 pages) le 25/10
 - [ ] **4** TOUS : `destroy` + `up` sur un poste vierge ; démo répétée ; chacun a lancé chaque scénario
 - [ ] **Rotation** : [x] KOBENDE (v2), [ ] OUEDRAOGO (§ 5.1), [x] THIOMBIANO (commun.sh), [x] PORGO (v6)
 
@@ -242,9 +248,25 @@ puisse la défendre en soutenance.
 | L3 | Journal de bord | **1 à 2 pages** : rôles, décisions et pourquoi, difficultés et solutions | tous | `docs/journal_de_bord.md` |
 | L4 | Démonstration | **20 min** sur machine vierge : destruction, reconstruction, 3 scénarios tirés au sort | tous | — |
 
-Conversion pour le rendu, depuis la racine du dépôt (modèle compact `docs/modele_word.docx` : dossier en 14 pages, journal en 2 pages) :
+Conversion pour le rendu, depuis la racine du dépôt (modèle compact `docs/modele_word.docx` : dossier en 15 pages, journal en 2 pages), puis export PDF avec LibreOffice ou Word :
 
 ```bash
 pandoc docs/dossier_architecture.md --resource-path=docs --reference-doc docs/modele_word.docx -o docs/dossier_architecture.docx
 pandoc docs/journal_de_bord.md --reference-doc docs/modele_word.docx -o docs/journal_de_bord.docx
 ```
+
+### Ce qu'il faut envoyer à l'enseignant
+
+| # | Quoi | Fichier ou lien |
+|---|---|---|
+| 1 | **Lien du dépôt Git** (L1) | https://github.com/PorgoAbdoulNassirou/Projet-Virtualisation-Cloud (dépôt **public**, ou enseignant invité comme collaborateur s'il est privé) |
+| 2 | **Dossier d'architecture** (L2), 15 pages | `docs/dossier_architecture.pdf` (et `docs/dossier_architecture.docx` si un format modifiable est demandé) |
+| 3 | **Journal de bord** (L3), 2 pages | `docs/journal_de_bord.pdf` (et `.docx`) |
+| 4 | **Démonstration** (L4) | rien à envoyer : en direct, fiche `docs/DEMONSTRATION.md` |
+
+Message type : « Groupe 04 (KOBENDE, PORGO, OUEDRAOGO, THIOMBIANO), projet RÉSULTATS-BF. Dépôt : <lien>.
+Ci-joints le dossier d'architecture et le journal de bord. Le README du dépôt suffit pour reconstruire la
+plateforme (`vagrant up`). »
+
+**Avant d'envoyer** : (1) commit de rotation d'OUEDRAOGO fusionné ; (2) vérifier que le dépôt est
+accessible à l'enseignant ; (3) ne jamais joindre le fichier `.env`.

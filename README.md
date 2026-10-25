@@ -161,7 +161,7 @@ resultats-bf/
 │   ├── reintegrer_bdd.sh    # remise en service de l'ancien primaire comme réplique
 │   └── obs.sh               # Prometheus + Grafana
 ├── tests/                   # scénarios V1 à V6 et résultats bruts
-└── docs/                    # plan de travail, dossier d'architecture, journal de bord
+└── docs/                    # installation, plan de travail, démonstration, dossier et journal (.md, .docx, .pdf)
 ```
 
 ---
@@ -191,4 +191,4 @@ resultats-bf/
 | OUEDRAOGO Armand Hendrix | Ingénieur données (PostgreSQL, réplication, bascule, E3) |
 | THIOMBIANO Yempabou Romaric Johan | Ingénieur essais et observabilité (V1 à V6, E2) |
 
-Répartition détaillée : [docs/PLAN_DE_TRAVAIL.md](docs/PLAN_DE_TRAVAIL.md).
+Répartition détaillée : [docs/PLAN_DE_TRAVAIL.md](docs/PLAN_DE_TRAVAIL.md). Livrables : [docs/dossier_architecture.pdf](docs/dossier_architecture.pdf), [docs/journal_de_bord.pdf](docs/journal_de_bord.pdf). Démonstration : [docs/DEMONSTRATION.md](docs/DEMONSTRATION.md).

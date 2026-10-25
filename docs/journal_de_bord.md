@@ -1,11 +1,16 @@
-# Journal de bord : RÉSULTATS-BF
+---
+title: "Journal de bord : RÉSULTATS-BF"
+author:
+  - "Groupe 04 : KOBENDE Pêgdwendé Evrard, PORGO Abdoul Nassirou, OUEDRAOGO Armand Hendrix, THIOMBIANO Yempabou Romaric Johan"
+date: "M1 Informatique, IBAM · Virtualisation et Cloud Computing · Dr SOMDA · 26 octobre 2026"
+---
 
-> Livrable L3, 1 à 2 pages. Groupe 04. Le détail de chaque point est dans le dossier d'architecture (§ indiqué).
+Le détail de chaque point est dans le dossier d'architecture (§ indiqué).
 
 **Rôles.** PORGO Abdoul Nassirou : architecte réseau et répartition (E1). KOBENDE Pêgdwendé Evrard :
 ingénieur applicatif. OUEDRAOGO Armand Hendrix : ingénieur données. THIOMBIANO Yempabou Romaric Johan :
-ingénieur essais et observabilité (E2). Rotation : chacun a au moins un commit hors de son domaine
-(V2 par KOBENDE, V6 par PORGO, node_exporter dans `commun.sh` par THIOMBIANO).
+ingénieur essais et observabilité (E2). Commits hors de son domaine (rotation) : V2 par KOBENDE, V6 et
+remise en service de la base par PORGO, node_exporter dans `commun.sh` par THIOMBIANO.
 
 ## Décisions prises et pourquoi
 
@@ -29,7 +34,7 @@ ingénieur essais et observabilité (E2). Rotation : chacun a au moins un commit
 | Qui | Difficulté | Solution |
 |---|---|---|
 | PORGO | La box `202404.23.0` du squelette n'existe pas pour virtualbox/amd64 | Épinglage sur `202510.26.0` pour tout le groupe |
-| PORGO | Exportateur Prometheus actif sur lb2 seulement : `haproxy -vv \| grep -q` échoue au hasard sous `pipefail` (SIGPIPE) | Sortie capturée dans une variable avant le test |
+| PORGO | Exportateur Prometheus actif sur lb2 seulement : `haproxy -vv` filtré par `grep -q` échoue au hasard sous `pipefail` (SIGPIPE) | Sortie capturée dans une variable avant le test |
 | PORGO | V6 : première mesure prise depuis l'ordre `vagrant halt`, alors que lb1 sert encore pendant son arrêt | Mesure de l'interruption réelle : 1,7 s ; les deux fichiers bruts sont conservés |
 | PORGO | VM figée en SSH par manque de RAM sur l'hôte | `vagrant reload` ; `E2_OBS=0` pendant le développement |
 | PORGO | Après une bascule réussie, service toujours en 503 : `/sante` dépasse `timeout check 1s` (libpq essaie d'abord bdd1 éteinte) | `timeout check 3s` ; compromis documenté (§ 3.1) |
@@ -37,4 +42,5 @@ ingénieur essais et observabilité (E2). Rotation : chacun a au moins un commit
 | KOBENDE | Mac M2 (ARM) : la box amd64 ne tourne pas | `app.py` testé sans base sur l'hôte ; tests en VM sur le poste de PORGO |
 | THIOMBIANO | Grafana 13 met 10 min à démarrer sur 768 Mo (une douzaine de plugins, un processus chacun) : provisionnement en échec | Plugins inutiles désactivés : 1 min 08 s, puis « inchangé » au rejeu (§ 3.5) |
 | THIOMBIANO | Grafana affichait DOWN des machines détruites volontairement (retour à N = 2) | États en requête instantanée, frise d'historique des pannes |
+| PORGO | Validation finale (7 machines) : `vagrant up` en échec sur obs, apt.grafana.com injoignable depuis le réseau du poste (connexion réinitialisée), alors que dl.grafana.com répond | Grafana 13.2.4 installé depuis le paquet `.deb` de dl.grafana.com, empreinte SHA-256 inscrite dans `obs.sh`, mis en cache dans `.cache/` : la reconstruction ne dépend plus de ce dépôt |
 | THIOMBIANO | V3 : 41 % puis 53 % de 503 sous `ab -c 50`, débit utile en baisse quand N double | Diagnostic : bdd1 (1 vCPU) saturée par une connexion SCRAM par requête ; résultat expliqué (§ 6.3), PgBouncer proposé (§ 7) |

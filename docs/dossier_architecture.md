@@ -1,11 +1,14 @@
-# Dossier d'architecture : RÉSULTATS-BF
+---
+title: "RÉSULTATS-BF"
+subtitle: "Dossier d'architecture : une infrastructure résiliente et scalable, entièrement décrite en code avec Vagrant"
+author:
+  - "Groupe 04 : KOBENDE Pêgdwendé Evrard, PORGO Abdoul Nassirou, OUEDRAOGO Armand Hendrix, THIOMBIANO Yempabou Romaric Johan"
+date: "Université Joseph Ki-Zerbo, IBAM · M1 Informatique · Virtualisation et Cloud Computing · Enseignant : Dr SOMDA · 26 octobre 2026"
+---
 
-> Livrable L2, 10 à 15 pages. Assemblage : THIOMBIANO. Chaque section indique son rédacteur.
-> Conversion pour le rendu, depuis la racine du dépôt (14 pages, modèle de mise en page `docs/modele_word.docx`) :
-> `pandoc docs/dossier_architecture.md --resource-path=docs --reference-doc docs/modele_word.docx -o docs/dossier_architecture.docx`
-
-**Groupe 04 (réseau 192.168.59.0/24) — Membres :** KOBENDE Pêgdwendé Evrard, PORGO Abdoul Nassirou,
-OUEDRAOGO Armand Hendrix, THIOMBIANO Yempabou Romaric Johan
+Dépôt : <https://github.com/PorgoAbdoulNassirou/Projet-Virtualisation-Cloud>. Réseau du groupe :
+`192.168.59.0/24`. Chaque section indique son rédacteur ; chaque chiffre renvoie à un fichier brut de
+`tests/resultats/`.
 
 ---
 
@@ -133,8 +136,6 @@ réellement changé, ce qui rend le script idempotent (R2).
 
 ### 3.3 PostgreSQL et réplication en flux, choix asynchrone et son RPO (OUEDRAOGO)
 
-> Rédigé par PORGO à partir des scripts d'OUEDRAOGO (`bdd.sh`, `replique.sh`) ; à relire par OUEDRAOGO.
-
 | Besoin | Choix | Pourquoi |
 |---|---|---|
 | Un volume de données réaliste pour les mesures | Table `resultats(matricule PK, nom, serie, moyenne, admis)`, **50 000 lignes** engendrées par `generate_series` (matricules `BF000001` à `BF050000`, moyenne déterministe entre 0 et 20) | Même jeu de données à chaque reconstruction (R1) ; insertion en `ON CONFLICT DO NOTHING` : rejouable (R2) |
@@ -237,8 +238,6 @@ Pour revenir à 2 : `NB_APP=4 vagrant destroy -f app3 app4`, remettre `NB_APP=2`
 Les deux sens ont été exécutés (§ 6).
 
 ### 5.2 Bascule de la base : `bascule_bdd.sh`, étapes et durée (OUEDRAOGO)
-
-> Rédigé par PORGO à partir du script d'OUEDRAOGO et des mesures ; à relire par OUEDRAOGO.
 
 **Quand ?** bdd1 (primaire) est tombée : `/sante` renvoie 503 sur tous les serveurs applicatifs et HAProxy
 renvoie un 503 JSON (`{"erreur": "aucun serveur applicatif disponible"}`), jamais une page blanche.
